@@ -1,11 +1,22 @@
+import React from 'react';
 import { useFlowStore } from '@/store/flowStore';
 import { cn } from '@/lib/utils';
 
 export default function YamlEditor() {
   const { yamlContent, setYamlContent } = useFlowStore();
+  const previewRef = React.useRef<HTMLDivElement>(null);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setYamlContent(e.target.value);
+  };
+
+  // Synchronize scroll between textarea and preview
+  const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    if (previewRef.current && e.currentTarget) {
+      previewRef.current.scrollTop = e.currentTarget.scrollTop;
+      previewRef.current.scrollLeft = e.currentTarget.scrollLeft;
+    }
   };
 
   // Simple syntax highlighting by adding color spans
@@ -56,7 +67,10 @@ export default function YamlEditor() {
   return (
     <div className="relative w-full h-full bg-steel-950 rounded-lg border border-border overflow-hidden">
       {/* Line numbers and syntax highlighted preview */}
-      <div className="absolute inset-0 overflow-auto p-4 font-mono text-sm pointer-events-none">
+      <div
+        ref={previewRef}
+        className="absolute inset-0 overflow-auto p-4 font-mono text-sm pointer-events-none"
+      >
         <div className="flex">
           <div className="pr-4 text-right text-muted-foreground/50 select-none border-r border-border mr-4">
             {yamlContent.split('\n').map((_, idx) => (
@@ -68,11 +82,13 @@ export default function YamlEditor() {
           <div className="flex-1">{highlightedContent}</div>
         </div>
       </div>
-      
+
       {/* Actual textarea for editing */}
       <textarea
+        ref={textareaRef}
         value={yamlContent}
         onChange={handleChange}
+        onScroll={handleScroll}
         className={cn(
           "absolute inset-0 w-full h-full resize-none",
           "bg-transparent font-mono text-sm p-4 pl-16",
@@ -81,8 +97,8 @@ export default function YamlEditor() {
           "leading-relaxed"
         )}
         spellCheck={false}
-        style={{ 
-          paddingLeft: `${String(yamlContent.split('\n').length).length * 10 + 48}px` 
+        style={{
+          paddingLeft: `${String(yamlContent.split('\n').length).length * 10 + 48}px`
         }}
       />
     </div>
