@@ -1,11 +1,56 @@
 import { create } from 'zustand';
 import yaml from 'js-yaml';
 
-export interface FlowStep {
-  type: 'decision' | 'action' | 'start' | 'end';
-  label: string;
-  description: string;
+// Complex YAML structure support
+export interface StepCondition {
+  field: string;
+  operator: string;
+  value: string | number;
   next_step?: string;
+}
+
+export interface StepOption {
+  label: string;
+  value: string;
+  next_step: string;
+}
+
+export interface StepValidation {
+  type: string;
+  range?: [number, number];
+  options?: string[];
+  error_message?: string;
+}
+
+export interface StepConfig {
+  prompt?: string;
+  field_name?: string;
+  validation?: StepValidation;
+  conditions?: StepCondition[];
+  default_next_step?: string;
+  options?: StepOption[];
+  instructions_text?: string;
+  confirmation_required?: boolean;
+  action_type?: string;
+  action_params?: Record<string, unknown>;
+  result_field?: string;
+  wait_duration_seconds?: number;
+  validation_action?: Record<string, unknown>;
+  success_next_step?: string;
+  failure_next_step?: string;
+}
+
+export interface FlowStep {
+  step_id?: string;
+  name?: string;
+  type: 'collect_information' | 'evaluate_condition' | 'decision_point' |
+  'provide_instructions' | 'execute_action' | 'wait_and_validate' |
+  'decision' | 'action' | 'start' | 'end'; // Keep backwards compatibility
+  description?: string;
+  label?: string; // For backwards compatibility
+  next_step?: string;
+  config?: StepConfig;
+  // Legacy support
   options?: Array<{
     label: string;
     next_step: string;
@@ -15,6 +60,8 @@ export interface FlowStep {
 export interface FlowData {
   flow_id: string;
   name: string;
+  description?: string;
+  initial_step?: string;
   steps: Record<string, FlowStep>;
 }
 
@@ -29,29 +76,29 @@ interface FlowStore {
   // YAML content
   yamlContent: string;
   setYamlContent: (content: string) => void;
-  
+
   // Parsed flow data
   flowData: FlowData | null;
   parseYaml: () => void;
-  
+
   // API Key
   apiKey: string;
   setApiKey: (key: string) => void;
-  
+
   // View mode
   viewMode: 'visual' | 'code' | 'split';
   setViewMode: (mode: 'visual' | 'code' | 'split') => void;
-  
+
   // AI Copilot
   isCopilotOpen: boolean;
   toggleCopilot: () => void;
   chatMessages: ChatMessage[];
   addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
-  
+
   // History
   flowHistory: Array<{ name: string; timestamp: Date }>;
   addToHistory: (name: string) => void;
-  
+
   // File handling
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
@@ -99,7 +146,7 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
     set({ yamlContent: content });
     get().parseYaml();
   },
-  
+
   flowData: null,
   parseYaml: () => {
     try {
@@ -110,16 +157,16 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
       set({ flowData: null });
     }
   },
-  
+
   apiKey: '',
   setApiKey: (key) => set({ apiKey: key }),
-  
+
   viewMode: 'visual',
   setViewMode: (mode) => set({ viewMode: mode }),
-  
+
   isCopilotOpen: true,
   toggleCopilot: () => set((state) => ({ isCopilotOpen: !state.isCopilotOpen })),
-  
+
   chatMessages: [],
   addChatMessage: (message) => set((state) => ({
     chatMessages: [
@@ -131,7 +178,7 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
       },
     ],
   })),
-  
+
   flowHistory: [],
   addToHistory: (name) => set((state) => ({
     flowHistory: [
@@ -139,7 +186,7 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
       ...state.flowHistory.slice(0, 9),
     ],
   })),
-  
+
   isProcessing: false,
   setIsProcessing: (processing) => set({ isProcessing: processing }),
 }));

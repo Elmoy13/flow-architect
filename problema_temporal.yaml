@@ -1,0 +1,615 @@
+flow_id: "problema_temporal"
+name: "Problema Temporal XVIEW+"
+description: "Flujo de diagnóstico completo para error 'Problema Temporal' en XVIEW+ OTT con validación de conexión, aprovisionamiento, dispositivo ONT, IP de video y niveles ópticos"
+version: "2.0.0"
+language: "es"
+keywords:
+  - "problema temporal"
+  - "error temporal"
+  - "video no funciona"
+  - "xview+"
+  - "sin servicio"
+
+initial_step: "step_1_connection_type"
+
+constants:
+  rssi_threshold: -65
+  wait_time_seconds_min: 180
+  wait_time_seconds_max: 300
+  scheduling_cutoff_hour: 14
+  wifi_ultra_price: 50.00
+
+steps:
+  # ========== STEP 1: Connection Type Validation ==========
+  step_1_connection_type:
+    step_id: "step_1_connection_type"
+    name: "Validación de Tipo de Conexión"
+    description: "Identificar si la conexión es Wi-Fi o Ethernet"
+    type: "collect_information"
+    config:
+      prompt: |
+        Para diagnosticar el problema, necesito saber cómo está conectado su equipo.
+        
+        Por favor, vaya a: Menú principal → Ajustes de Android → Internet y red
+        
+        ¿Su equipo está conectado por Wi-Fi o por Ethernet (cable de red)?
+      field_name: "connection_type"
+      validation:
+        type: "choice"
+        options: ["wifi", "ethernet"]
+        error_message: "Por favor indique si su conexión es Wi-Fi o Ethernet"
+    next_step: "step_1_route_connection"
+
+  step_1_route_connection:
+    step_id: "step_1_route_connection"
+    name: "Enrutar según Tipo de Conexión"
+    type: "evaluate_condition"
+    config:
+      conditions:
+        - field: "connection_type"
+          operator: "=="
+          value: "ethernet"
+          next_step: "step_2_restart_device"
+        - field: "connection_type"
+          operator: "=="
+          value: "wifi"
+          next_step: "step_1a_collect_rssi"
+    next_step: "step_2_restart_device"
+
+  # ========== STEP 1A-1E: Wi-Fi RSSI Validation and Service Offers ==========
+  step_1a_collect_rssi:
+    step_id: "step_1a_collect_rssi"
+    name: "Recolectar Valor RSSI"
+    description: "Obtener la intensidad de señal Wi-Fi del cliente"
+    type: "collect_information"
+    config:
+      prompt: |
+        Para verificar la calidad de su señal Wi-Fi, necesito que me proporcione el valor de WIFI RSSI.
+        
+        Puede encontrarlo en: Pantalla principal → Ajustes → Prueba de Conexión → WIFI RSSI
+        
+        ¿Cuál es el valor en dBm? (Por ejemplo: -60, -75, -85)
+      field_name: "rssi_value"
+      validation:
+        type: "number"
+        range: [-100, 0]
+        error_message: "El valor RSSI debe estar entre -100 y 0 dBm"
+    next_step: "step_1b_evaluate_rssi"
+
+  step_1b_evaluate_rssi:
+    step_id: "step_1b_evaluate_rssi"
+    name: "Evaluar Umbral RSSI"
+    description: "Determinar si RSSI está por debajo del umbral de -65 dBm"
+    type: "evaluate_condition"
+    config:
+      conditions:
+        - field: "rssi_value"
+          operator: "<"
+          value: -65
+          next_step: "step_1c_offer_upgrade"
+      default_next_step: "step_2_restart_device"
+
+  step_1c_offer_upgrade:
+    step_id: "step_1c_offer_upgrade"
+    name: "Ofrecer Up Grade"
+    description: "Ofrecer cambio de paquete por señal débil"
+    type: "decision_point"
+    config:
+      prompt: |
+        Su señal Wi-Fi es débil (RSSI: {rssi_value} dBm). Para mejorar su experiencia, le ofrecemos un cambio de paquete (Up Grade) con mayor velocidad.
+        
+        ¿Le interesa conocer los paquetes disponibles y realizar el cambio?
+      options:
+        - label: "Sí, acepto el Up Grade"
+          value: "accept_upgrade"
+          next_step: "step_close_upgrade_accepted"
+        - label: "No, gracias"
+          value: "decline_upgrade"
+          next_step: "step_1d_offer_wifi_ultra"
+
+  step_1d_offer_wifi_ultra:
+    step_id: "step_1d_offer_wifi_ultra"
+    name: "Ofrecer WIFI ULTRA"
+    description: "Ofrecer servicio WIFI ULTRA para mejor cobertura"
+    type: "decision_point"
+    config:
+      prompt: |
+        Le ofrecemos WIFI ULTRA, que mejorará significativamente el desempeño y cobertura WiFi en su hogar por solo $50.00 adicionales a su mensualidad.
+        
+        ¿Le interesa contratarlo?
+      options:
+        - label: "Sí, acepto WIFI ULTRA"
+          value: "accept_wifi_ultra"
+          next_step: "step_close_wifi_ultra_accepted"
+        - label: "No, gracias"
+          value: "decline_wifi_ultra"
+          next_step: "step_1e_qt_cable_box"
+
+  step_1e_qt_cable_box:
+    step_id: "step_1e_qt_cable_box"
+    name: "Generar QT para Cablear Caja"
+    description: "Generar queja técnica para cablear la caja digital debido a señal Wi-Fi débil"
+    type: "execute_action"
+    config:
+      action_type: "generate_technical_complaint"
+      action_params:
+        reason: "poor_wifi_signal"
+        registration_template: "qt_cable_box"
+        note: "Cablear caja digital"
+
+  # ========== STEP 2: Set-Top Box Restart ==========
+  step_2_restart_device:
+    step_id: "step_2_restart_device"
+    name: "Reinicio de Caja Digital"
+    description: "Solicitar reinicio de la caja desde el control remoto"
+    type: "provide_instructions"
+    config:
+      instructions_text: |
+        Vamos a reiniciar su caja digital. Por favor, siga estos pasos:
+        
+        1. Mantenga presionado el botón Power en su control remoto durante unos segundos
+        2. Cuando aparezca el recuadro en pantalla, seleccione "Reiniciar"
+        3. Presione OK para confirmar
+        4. Espere a que el equipo se reinicie completamente (aproximadamente 1-2 minutos)
+        
+        Después del reinicio, verifique si el servicio se restableció.
+      confirmation_required: true
+    next_step: "step_2a_validate_restart"
+
+  step_2a_validate_restart:
+    step_id: "step_2a_validate_restart"
+    name: "Validar Servicio Después del Reinicio"
+    type: "decision_point"
+    config:
+      prompt: "Después del reinicio, ¿el servicio de XVIEW+ ya funciona correctamente?"
+      options:
+        - label: "Sí, el servicio se restableció"
+          value: "service_restored"
+          next_step: "step_close_restart_resolved"
+        - label: "No, continúa sin servicio"
+          value: "service_not_restored"
+          next_step: "step_3_check_provisioning"
+
+  # ========== STEP 3: Provisioning Validation ==========
+  step_3_check_provisioning:
+    step_id: "step_3_check_provisioning"
+    name: "Validar Aprovisionamiento"
+    description: "Verificar estado de aprovisionamiento en SFyC"
+    type: "execute_action"
+    config:
+      action_type: "external_api"
+      action_params:
+        api_name: "sfyc_provisioning_check"
+        endpoint: "diagnostico_tecnico/analisis_incognito"
+      result_field: "provisioning_status"
+    next_step: "step_3a_route_provisioning"
+
+  step_3a_route_provisioning:
+    step_id: "step_3a_route_provisioning"
+    name: "Enrutar según Estado de Aprovisionamiento"
+    type: "evaluate_condition"
+    config:
+      conditions:
+        - field: "provisioning_status"
+          operator: "=="
+          value: "provisioned"
+          next_step: "step_4_check_device_status"
+        - field: "provisioning_status"
+          operator: "=="
+          value: "error"
+          next_step: "step_3b_reprovision"
+        - field: "provisioning_status"
+          operator: "=="
+          value: "sin_informacion"
+          next_step: "step_6_check_optical_levels"
+      default_next_step: "step_4_check_device_status"
+
+  step_3b_reprovision:
+    step_id: "step_3b_reprovision"
+    name: "Ejecutar Reaprovisionamiento"
+    description: "Enviar reaprovisionamiento desde Servicios web → Equipos"
+    type: "execute_action"
+    config:
+      action_type: "external_api"
+      action_params:
+        api_name: "sfyc_reprovision"
+        endpoint: "servicios_web/equipos/reaprovisionar"
+      result_field: "reprovision_result"
+    next_step: "step_3c_wait_reprovision"
+
+  step_3c_wait_reprovision:
+    step_id: "step_3c_wait_reprovision"
+    name: "Esperar Reaprovisionamiento"
+    description: "Esperar a que el equipo se reinicie después del reaprovisionamiento"
+    type: "provide_instructions"
+    config:
+      instructions_text: |
+        He enviado una actualización para activar su servicio. El equipo se reiniciará automáticamente.
+        
+        Por favor, espere unos minutos mientras se completa el proceso y luego verifique si el servicio funciona.
+      confirmation_required: true
+    next_step: "step_3d_validate_reprovision"
+
+  step_3d_validate_reprovision:
+    step_id: "step_3d_validate_reprovision"
+    name: "Validar Servicio Después de Reaprovisionamiento"
+    type: "decision_point"
+    config:
+      prompt: "Después del reaprovisionamiento, ¿el servicio de XVIEW+ ya funciona correctamente?"
+      options:
+        - label: "Sí, el servicio se restableció"
+          value: "service_restored"
+          next_step: "step_close_reprovision_resolved"
+        - label: "No, continúa sin servicio - Error de aprovisionamiento"
+          value: "service_not_restored_provisioning_error"
+          next_step: "step_close_escalate_bo_provisioning"
+        - label: "No, continúa sin servicio - Sin error aparente"
+          value: "service_not_restored_no_error"
+          next_step: "step_close_qt_no_service_after_reprovision"
+
+  # ========== STEP 4: Device Status (ONT) Validation ==========
+  step_4_check_device_status:
+    step_id: "step_4_check_device_status"
+    name: "Validar Devidestatus de ONT"
+    description: "Verificar si la ONT está Online u Offline"
+    type: "execute_action"
+    config:
+      action_type: "external_api"
+      action_params:
+        api_name: "sfyc_device_status"
+        endpoint: "diagnostico_tecnico/analisis_niveles"
+      result_field: "device_status"
+    next_step: "step_4a_route_device_status"
+
+  step_4a_route_device_status:
+    step_id: "step_4a_route_device_status"
+    name: "Enrutar según Devidestatus"
+    type: "evaluate_condition"
+    config:
+      conditions:
+        - field: "device_status"
+          operator: "=="
+          value: "Online"
+          next_step: "step_5_check_video_ip"
+        - field: "device_status"
+          operator: "=="
+          value: "Offline"
+          next_step: "step_close_qt_ont_offline"
+      default_next_step: "step_5_check_video_ip"
+
+  # ========== STEP 5: Video IP Validation ==========
+  step_5_check_video_ip:
+    step_id: "step_5_check_video_ip"
+    name: "Validar IP de Video"
+    description: "Verificar si la ONT tiene IP de video asignada"
+    type: "execute_action"
+    config:
+      action_type: "external_api"
+      action_params:
+        api_name: "sfyc_video_ip"
+        endpoint: "diagnostico_tecnico/ip_video"
+      result_field: "video_ip"
+    next_step: "step_5a_route_video_ip"
+
+  step_5a_route_video_ip:
+    step_id: "step_5a_route_video_ip"
+    name: "Enrutar según IP de Video"
+    type: "evaluate_condition"
+    config:
+      conditions:
+        - field: "video_ip"
+          operator: "!="
+          value: "0.0.0.0"
+          next_step: "step_6_check_optical_levels"
+        - field: "video_ip"
+          operator: "=="
+          value: "0.0.0.0"
+          next_step: "step_5b_reload_values"
+        - field: "video_ip"
+          operator: "=="
+          value: "sin_informacion"
+          next_step: "step_6_check_optical_levels"
+      default_next_step: "step_6_check_optical_levels"
+
+  step_5b_reload_values:
+    step_id: "step_5b_reload_values"
+    name: "Recargar Valores de IP"
+    description: "Ejecutar recarga de valores desde Cable Modems"
+    type: "execute_action"
+    config:
+      action_type: "external_api"
+      action_params:
+        api_name: "sfyc_reload_values"
+        endpoint: "servicios_web/equipos/cable_modems/recargar_valores"
+      result_field: "reload_result"
+    next_step: "step_5c_wait_reload"
+
+  step_5c_wait_reload:
+    step_id: "step_5c_wait_reload"
+    name: "Esperar Sincronización de IP"
+    description: "Esperar 3-5 minutos para sincronización"
+    type: "wait_and_validate"
+    config:
+      wait_duration_seconds: 180
+      validation_action:
+        api_name: "sfyc_video_ip"
+        endpoint: "diagnostico_tecnico/ip_video"
+      success_next_step: "step_5d_validate_ip_after_reload"
+      failure_next_step: "step_5d_validate_ip_after_reload"
+
+  step_5d_validate_ip_after_reload:
+    step_id: "step_5d_validate_ip_after_reload"
+    name: "Validar IP Después de Recarga"
+    type: "evaluate_condition"
+    config:
+      conditions:
+        - field: "video_ip"
+          operator: "=="
+          value: "0.0.0.0"
+          next_step: "step_close_escalate_supervisor_no_ip"
+        - field: "video_ip"
+          operator: "!="
+          value: "0.0.0.0"
+          next_step: "step_5e_validate_service_after_ip"
+      default_next_step: "step_6_check_optical_levels"
+
+  step_5e_validate_service_after_ip:
+    step_id: "step_5e_validate_service_after_ip"
+    name: "Validar Servicio con IP Asignada"
+    type: "decision_point"
+    config:
+      prompt: "La IP de video ya está asignada. ¿El servicio de XVIEW+ funciona correctamente ahora?"
+      options:
+        - label: "Sí, el servicio funciona"
+          value: "service_restored"
+          next_step: "step_close_ip_reload_resolved"
+        - label: "No, continúa con fallas"
+          value: "service_not_restored"
+          next_step: "step_6_check_optical_levels"
+
+  # ========== STEP 6: Optical Levels Validation ==========
+  step_6_check_optical_levels:
+    step_id: "step_6_check_optical_levels"
+    name: "Validar Niveles Ópticos RX/TX"
+    description: "Verificar niveles RX Power y TX Power de la ONT"
+    type: "execute_action"
+    config:
+      action_type: "external_api"
+      action_params:
+        api_name: "sfyc_optical_levels"
+        endpoint: "diagnostico_tecnico/analisis_niveles"
+      result_field: "optical_levels_status"
+    next_step: "step_6a_route_optical_levels"
+
+  step_6a_route_optical_levels:
+    step_id: "step_6a_route_optical_levels"
+    name: "Enrutar según Niveles Ópticos"
+    type: "evaluate_condition"
+    config:
+      conditions:
+        - field: "optical_levels_status"
+          operator: "=="
+          value: "correct"
+          next_step: "step_close_escalate_bo_video"
+        - field: "optical_levels_status"
+          operator: "=="
+          value: "incorrect"
+          next_step: "step_close_qt_incorrect_levels"
+      default_next_step: "step_close_escalate_bo_video"
+
+  # ========== CLOSURE STEPS ==========
+  step_close_upgrade_accepted:
+    step_id: "step_close_upgrade_accepted"
+    name: "Cierre - Up Grade Aceptado"
+    type: "execute_action"
+    config:
+      action_type: "close_case"
+      action_params:
+        outcome: "upgrade_accepted"
+        registration_template: "upgrade_accepted"
+
+  step_close_wifi_ultra_accepted:
+    step_id: "step_close_wifi_ultra_accepted"
+    name: "Cierre - WIFI ULTRA Aceptado"
+    type: "execute_action"
+    config:
+      action_type: "close_case"
+      action_params:
+        outcome: "wifi_ultra_accepted"
+        registration_template: "wifi_ultra_accepted"
+
+  step_close_restart_resolved:
+    step_id: "step_close_restart_resolved"
+    name: "Cierre - Resuelto con Reinicio"
+    type: "execute_action"
+    config:
+      action_type: "close_case"
+      action_params:
+        outcome: "resolved"
+        registration_template: "restart_resolved"
+
+  step_close_reprovision_resolved:
+    step_id: "step_close_reprovision_resolved"
+    name: "Cierre - Resuelto con Reaprovisionamiento"
+    type: "execute_action"
+    config:
+      action_type: "close_case"
+      action_params:
+        outcome: "resolved"
+        registration_template: "reprovision_resolved"
+
+  step_close_ip_reload_resolved:
+    step_id: "step_close_ip_reload_resolved"
+    name: "Cierre - Resuelto con Recarga de IP"
+    type: "execute_action"
+    config:
+      action_type: "close_case"
+      action_params:
+        outcome: "resolved"
+        registration_template: "ip_reload_resolved"
+
+  step_close_escalate_bo_provisioning:
+    step_id: "step_close_escalate_bo_provisioning"
+    name: "Cierre - Escalar a BO por Error de Aprovisionamiento"
+    type: "execute_action"
+    config:
+      action_type: "escalate_backoffice"
+      action_params:
+        category: "APROVISIONAMIENTO/SIN_IPS/ACS"
+        subcategory: "INTERNET/ERROR_DE_APROVISIONAMIENTO"
+        registration_template: "escalate_bo_provisioning"
+
+  step_close_escalate_bo_video:
+    step_id: "step_close_escalate_bo_video"
+    name: "Cierre - Escalar a BO por Problema Temporal con Niveles Correctos"
+    type: "execute_action"
+    config:
+      action_type: "escalate_backoffice"
+      action_params:
+        category: "VIDEO"
+        subcategory: "PROBLEMA_TEMPORAL"
+        registration_template: "escalate_bo_video"
+
+  step_close_escalate_supervisor_no_ip:
+    step_id: "step_close_escalate_supervisor_no_ip"
+    name: "Cierre - Pasar a Supervisor por IP sin Asignar"
+    type: "execute_action"
+    config:
+      action_type: "escalate_supervisor"
+      action_params:
+        reason: "no_ip_after_reload"
+        note: "IP continúa en 0.0.0.0 después de recarga de valores"
+
+  step_close_qt_no_service_after_reprovision:
+    step_id: "step_close_qt_no_service_after_reprovision"
+    name: "Cierre - QT por Servicio sin Restablecer Después de Reaprovisionamiento"
+    type: "execute_action"
+    config:
+      action_type: "generate_technical_complaint"
+      action_params:
+        reason: "no_service_after_reprovision"
+        registration_template: "qt_no_service_after_reprovision"
+
+  step_close_qt_ont_offline:
+    step_id: "step_close_qt_ont_offline"
+    name: "Cierre - QT por ONT Offline"
+    type: "execute_action"
+    config:
+      action_type: "generate_technical_complaint"
+      action_params:
+        reason: "ont_offline"
+        registration_template: "qt_ont_offline"
+
+  step_close_qt_incorrect_levels:
+    step_id: "step_close_qt_incorrect_levels"
+    name: "Cierre - QT por Niveles Incorrectos"
+    type: "execute_action"
+    config:
+      action_type: "generate_technical_complaint"
+      action_params:
+        reason: "incorrect_optical_levels"
+        registration_template: "qt_incorrect_levels"
+
+# ========== REGISTRATION TEMPLATES ==========
+registration_templates:
+  # Template 1: Reinicio de caja - queda con señal
+  restart_resolved: |
+    XVIEW+ > ME APARECE UN ERROR > PROBLEMA TEMPORAL > SOPORTE REINICIAR CAJA QUEDA CON SEÑAL
+    Sin señal en todos los canales PROBLEMA TEMPORAL / se le pide hacer reinicio de caja desde control remoto, queda con servicio restablecido. // {employee_number} // {employee_id}
+
+  # Template 2: RSSI incorrecto - Up Grade aceptado
+  upgrade_accepted: |
+    XVIEW+ > PROBLEMAS DE SEÑAL > VALORES RSSI INCORRECTOS > CAMBIO DE SERVICIO UP GRADE
+    Cte reporta fallas con XVIEW+, problemas con internet RSSI {rssi_value}, se le ofrece Upgrade cte acepta (Registrar paquete que se dio de alta: {package_name}). // {employee_number} // {employee_id}
+
+  # Template 3: RSSI incorrecto - WIFI ULTRA aceptado
+  wifi_ultra_accepted: |
+    XVIEW+ > PROBLEMAS DE SEÑAL > VALORES RSSI INCORRECTOS > VENTA DE WIFI ULTRA
+    Cliente reporta fallas con XVIEW+, problemas con internet RSSI {rssi_value}, se le ofrece Contratación de WIFI ULTRA, cliente acepta. // {employee_number} // {employee_id}
+
+  # Template 4: RSSI incorrecto - QT para cablear caja
+  qt_cable_box: |
+    XVIEW+ > PROBLEMAS DE SEÑAL > VALORES RSSI INCORRECTOS > QUEJA TECNICA
+    Problemas con XVIEW+ / Valor RSSI {rssi_value} / Cablear caja digital / Tel: {phone_number} / Horario: {time_slot}. // {employee_number} // {employee_id}
+
+  # Template 5: Aprovisionamiento - ticket BO (error aprovisionamiento)
+  escalate_bo_provisioning: |
+    XVIEW+ > ME APARECE UN ERROR > PROBLEMA TEMPORAL > SE GENERA TICKET SEGUNDO NIVEL BACKOFFICE
+    Sin servicio de XVIEW+ / PROBLEMA TEMPORAL / Sin aprovisionamiento // se envía aprovisionamiento, genera solicitud a segundo nivel BO. // {employee_number} // {employee_id}
+
+  # Template 6: Aprovisionamiento - sin aprovisionamiento, queda restablecido
+  reprovision_resolved: |
+    XVIEW+ > ME APARECE UN ERROR > PROBLEMA TEMPORAL > SIN APROVISIONAMIENTO
+    Sin servicio de XVIEW+ / PROBLEMA TEMPORAL / Sin aprovisionamiento // se envía aprovisionamiento, queda con servicio restablecido. // {employee_number} // {employee_id}
+
+  # Template 7: Aprovisionamiento - continúa sin servicio, QT
+  qt_no_service_after_reprovision: |
+    XVIEW+ > ME APARECE UN ERROR > SIN INTERNET > QUEJA TÉCNICA NIVELES INCORRECTOS
+    Sin Servicio XVIEW+ / Problema Temporal // sin causa aparente se genera queja / Tel: {phone_number} / Horario: {time_slot}. // {employee_number} // {employee_id}
+
+  # Template 8: Devidestatus Offline - QT
+  qt_ont_offline: |
+    XVIEW+ > ME APARECE UN ERROR > PROBLEMA TEMPORAL > CON APROVISIONAMIENTO/ NIVELES INCORRECTOS
+    Sin servicio de XVIEW+ / PROBLEMA TEMPORAL / ONT OFFLINE / Tel: {phone_number} / Horario: {time_slot}. // {employee_number} // {employee_id}
+
+  # Template 9: IP de video 0.0.0.0 - recarga valores, queda con señal
+  ip_reload_resolved: |
+    XVIEW+ > ME APARECE UN ERROR > PROBLEMA TEMPORAL > SIN APROVISIONAMIENTO
+    Sin servicio de XVIEW+ / PROBLEMA TEMPORAL / ONT sin IP // se envía aprovisionamiento, se le pide esperar 3-5 min y validar servicio. // {employee_number} // {employee_id}
+
+  # Template 10: Niveles correctos - ticket BO (VIDEO / PROBLEMA TEMPORAL)
+  escalate_bo_video: |
+    XVIEW+ > ME APARECE UN ERROR > PROBLEMA TEMPORAL > SE GENERA TICKET SEGUNDO NIVEL BACKOFFICE
+    Sin servicio de XVIEW+ / PROBLEMA TEMPORAL / aprovisionamiento y niveles correctos, se genera Ticket a BO, se le pide esperar minutos y validar servicio. // {employee_number} // {employee_id}
+
+  # Template 11: Niveles incorrectos - QT
+  qt_incorrect_levels: |
+    XVIEW+ > ME APARECE UN ERROR > PROBLEMA TEMPORAL > CON APROVISIONAMIENTO/ NIVELES INCORRECTOS
+    Sin servicio de XVIEW+ / PROBLEMA TEMPORAL / PROBLEMA DE NIVELES / Tel: {phone_number} / Horario: {time_slot}. // {employee_number} // {employee_id}
+
+# ========== ESCALATION RULES ==========
+escalation_rules:
+  backoffice_categories:
+    provisioning_error:
+      category: "APROVISIONAMIENTO/SIN_IPS/ACS"
+      subcategory: "INTERNET/ERROR_DE_APROVISIONAMIENTO"
+      description: "Error de aprovisionamiento sin servicios o suspendido"
+    
+    video_problem:
+      category: "VIDEO"
+      subcategory: "PROBLEMA_TEMPORAL"
+      description: "Problema temporal con aprovisionamiento y niveles correctos"
+  
+  technical_complaint_types:
+    - reason: "poor_wifi_signal"
+      description: "Señal Wi-Fi débil, requiere cablear caja digital"
+      note: "Cablear caja digital"
+    
+    - reason: "no_service_after_reprovision"
+      description: "Servicio no restablecido después de reaprovisionamiento"
+      note: "Sin causa aparente"
+    
+    - reason: "ont_offline"
+      description: "ONT en estado Offline"
+      note: "ONT OFFLINE"
+    
+    - reason: "incorrect_optical_levels"
+      description: "Niveles ópticos RX/TX incorrectos"
+      note: "PROBLEMA DE NIVELES"
+  
+  scheduling_rules:
+    cutoff_hour: 14
+    cutoff_timezone: "America/Mexico_City"
+    same_day_available: true
+    time_slots: ["AM", "PM"]
+    instructions: |
+      Si el reporte se ingresa antes de las 02:00 PM (horario centro), se agenda para mismo día por la tarde o día siguiente según preferencia.
+      Si el reporte se ingresa después de las 02:00 PM, se agenda al día siguiente según preferencia (AM/PM).
+      Si no se habilita la sección de agenda, dar clic en recargar.
+
+metadata:
+  author: "Support Team"
+  last_modified: "2026-01-27"
+  source_document: "CCN071_Problema_Temporal_Xview+_OTT.md"
+  tags: ["video", "xview+", "diagnostics", "problema_temporal", "provisioning", "ont", "optical_levels"]
+  version_notes: "Complete implementation with all 6 diagnostic steps and 11 registration templates"
