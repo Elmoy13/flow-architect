@@ -7,12 +7,17 @@ import {
   Copy, 
   Check, 
   Clock,
-  Loader2
+  Loader2,
+  Cpu,
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFlowStore } from '@/store/flowStore';
 import { useToast } from '@/hooks/use-toast';
 import mammoth from 'mammoth';
+import { programmaticParse } from '@/lib/programmaticParser';
+import { parseWithOpenAI } from '@/lib/openaiParser';
 
 export default function Sidebar() {
   const { 
@@ -75,30 +80,72 @@ export default function Sidebar() {
       const result = await mammoth.extractRawText({ arrayBuffer });
       const rawText = result.value;
 
-      if (!apiKey) {
-        // Simulation mode
+      if (!rawText || rawText.trim().length < 20) {
         toast({
-          title: 'Simulating conversion...',
-          description: 'No API key found. Loading default mock data.',
+          title: 'Empty document',
+          description: 'The document appears to be empty or too short.',
+          variant: 'destructive',
         });
-
-        // Add to history
-        addToHistory(file.name);
-
-        // Keep current YAML (mock data) but add a comment
-        setYamlContent(`# Converted from: ${file.name}\n# Document text length: ${rawText.length} characters\n${yamlContent}`);
-      } else {
-        // Real mode - would send to OpenAI
-        toast({
-          title: 'Processing document...',
-          description: 'Converting with AI (placeholder)',
-        });
-        addToHistory(file.name);
+        return;
       }
+
+      // STEP 1: Try programmatic parsing first
+      toast({
+        title: 'Analyzing document...',
+        description: 'Attempting rule-based parsing',
+      });
+
+      const programmaticResult = programmaticParse(rawText, file.name);
+
+      if (programmaticResult.success && programmaticResult.yaml) {
+        // Programmatic parsing succeeded!
+        toast({
+          title: '✅ Parsed successfully',
+          description: 'Document converted using rule-based analysis',
+        });
+        addToHistory(file.name);
+        setYamlContent(programmaticResult.yaml);
+        return;
+      }
+
+      // STEP 2: Programmatic failed, try OpenAI if we have a key
+      if (apiKey && apiKey.length > 10 && !apiKey.includes('xxxxxxxx')) {
+        toast({
+          title: 'Rule-based parsing failed',
+          description: 'Trying AI conversion...',
+        });
+
+        const aiResult = await parseWithOpenAI(rawText, file.name, apiKey);
+
+        if (aiResult.success && aiResult.yaml) {
+          toast({
+            title: '✨ AI conversion successful',
+            description: 'Document converted using OpenAI',
+          });
+          addToHistory(file.name);
+          setYamlContent(aiResult.yaml);
+          return;
+        }
+
+        // AI also failed
+        toast({
+          title: 'AI conversion failed',
+          description: aiResult.error || 'Could not parse document with AI',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // STEP 3: No valid API key and programmatic failed
+      toast({
+        title: 'Conversion failed',
+        description: `${programmaticResult.error || 'Could not parse document structure'}. Add an OpenAI API key to try AI-powered conversion.`,
+        variant: 'destructive',
+      });
     } catch (error) {
       toast({
         title: 'Error processing file',
-        description: 'Failed to extract text from document',
+        description: error instanceof Error ? error.message : 'Failed to extract text from document',
         variant: 'destructive',
       });
     } finally {
