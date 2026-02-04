@@ -7,8 +7,19 @@ interface ReactFlowData {
 }
 
 // Map complex step types to visual types
-function getVisualStepType(step: FlowStep): 'decision' | 'action' | 'start' | 'end' {
+function getVisualStepType(step: FlowStep, stepId?: string): 'decision' | 'action' | 'start' | 'end' {
   const type = step.type;
+
+  // Check if step name or ID contains "cierre" (closure/end step)
+  const isCierreStep =
+    (step.name && step.name.toLowerCase().includes('cierre')) ||
+    (step.step_id && step.step_id.toLowerCase().includes('close')) ||
+    (stepId && stepId.toLowerCase().includes('close'));
+
+  // If it's a cierre/close step, always show as "end"
+  if (isCierreStep) {
+    return 'end';
+  }
 
   switch (type) {
     case 'evaluate_condition':
@@ -218,7 +229,7 @@ export function yamlToReactFlow(flowData: FlowData | null): ReactFlowData {
       data: {
         label: getStepLabel(step),
         description: getStepDescription(step),
-        stepType: getVisualStepType(step),
+        stepType: getVisualStepType(step, stepKey),
         options: getStepOptions(step),
       },
     });
