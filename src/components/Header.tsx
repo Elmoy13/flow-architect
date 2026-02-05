@@ -237,9 +237,78 @@ export default function Header() {
                           onChange={(e) => setTempBedrockModelId(e.target.value)}
                           className="w-full p-2 rounded-md border bg-background text-xs font-mono h-9"
                         >
-                          <option value="anthropic.claude-3-sonnet-20240229-v1:0">Claude 3 Sonnet</option>
-                          <option value="anthropic.claude-3-opus-20240229-v1:0">Claude 3 Opus</option>
-                          <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</option>
+                          {/* Anthropic - Claude 3.7 & 3.5 (Recomendado) */}
+                          <optgroup label="🔥 Anthropic Claude (Recomendado)">
+                            <option value="anthropic.claude-3-7-sonnet-20250219-v1:0">Claude 3.7 Sonnet (Más avanzado)</option>
+                            <option value="anthropic.claude-3-5-sonnet-v2:0">Claude 3.5 Sonnet v2</option>
+                            <option value="anthropic.claude-3-5-sonnet-20240620-v1:0">Claude 3.5 Sonnet</option>
+                            <option value="anthropic.claude-3-5-haiku-20241022-v1:0">Claude 3.5 Haiku (Rápido)</option>
+                          </optgroup>
+
+                          {/* Anthropic - Claude 3 (Legacy) */}
+                          <optgroup label="Anthropic Claude 3">
+                            <option value="anthropic.claude-3-opus-20240229-v1:0">Claude 3 Opus</option>
+                            <option value="anthropic.claude-3-sonnet-20240229-v1:0">Claude 3 Sonnet</option>
+                            <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</option>
+                          </optgroup>
+
+                          {/* Amazon Nova */}
+                          <optgroup label="⚡ Amazon Nova (Nuevo 2026)">
+                            <option value="amazon.nova-pro-v1:0">Nova Pro (RAG & Multimodal)</option>
+                            <option value="amazon.nova-lite-v1:0">Nova Lite (Rápido)</option>
+                            <option value="amazon.nova-micro-v1:0">Nova Micro (Ultra rápido)</option>
+                          </optgroup>
+
+                          {/* Amazon Titan */}
+                          <optgroup label="Amazon Titan">
+                            <option value="amazon.titan-text-premier-v1:0">Titan Text Premier</option>
+                            <option value="amazon.titan-text-express-v1:0">Titan Text Express</option>
+                            <option value="amazon.titan-text-lite-v1:0">Titan Text Lite</option>
+                          </optgroup>
+
+                          {/* Meta Llama */}
+                          <optgroup label="🦙 Meta Llama 3 (Open Source)">
+                            <option value="meta.llama3-2-90b-instruct-v1:0">Llama 3.2 90B Instruct</option>
+                            <option value="meta.llama3-2-11b-instruct-v1:0">Llama 3.2 11B Instruct</option>
+                            <option value="meta.llama3-2-3b-instruct-v1:0">Llama 3.2 3B Instruct</option>
+                            <option value="meta.llama3-2-1b-instruct-v1:0">Llama 3.2 1B Instruct</option>
+                            <option value="meta.llama3-1-405b-instruct-v1:0">Llama 3.1 405B Instruct</option>
+                            <option value="meta.llama3-1-70b-instruct-v1:0">Llama 3.1 70B Instruct</option>
+                            <option value="meta.llama3-1-8b-instruct-v1:0">Llama 3.1 8B Instruct</option>
+                          </optgroup>
+
+                          {/* Mistral AI */}
+                          <optgroup label="🚀 Mistral AI">
+                            <option value="mistral.mistral-large-2407-v1:0">Mistral Large 3 (Multilingüe)</option>
+                            <option value="mistral.mistral-small-2402-v1:0">Mistral Small</option>
+                            <option value="mistral.mixtral-8x7b-instruct-v0:1">Mixtral 8x7B</option>
+                            <option value="mistral.ministral-3b-2410-v1:0">Ministral 3B (Bajo costo)</option>
+                            <option value="mistral.ministral-8b-2410-v1:0">Ministral 8B</option>
+                          </optgroup>
+
+                          {/* DeepSeek */}
+                          <optgroup label="🧮 DeepSeek (Razonamiento)">
+                            <option value="deepseek.deepseek-r1-distill-llama-70b-v1:0">DeepSeek R1 Llama 70B</option>
+                            <option value="deepseek.deepseek-r1-distill-qwen-32b-v1:0">DeepSeek R1 Qwen 32B</option>
+                            <option value="deepseek.deepseek-r1-distill-qwen-14b-v1:0">DeepSeek R1 Qwen 14B</option>
+                            <option value="deepseek.deepseek-r1-distill-qwen-7b-v1:0">DeepSeek R1 Qwen 7B</option>
+                            <option value="deepseek.deepseek-r1-distill-qwen-1-5b-v1:0">DeepSeek R1 Qwen 1.5B</option>
+                          </optgroup>
+
+                          {/* Cohere */}
+                          <optgroup label="🔍 Cohere (RAG Optimizado)">
+                            <option value="cohere.command-r-plus-v1:0">Command R+ (RAG Premium)</option>
+                            <option value="cohere.command-r-v1:0">Command R</option>
+                            <option value="cohere.command-light-v14">Command Light</option>
+                          </optgroup>
+
+                          {/* AI21 Labs */}
+                          <optgroup label="AI21 Labs">
+                            <option value="ai21.jamba-1-5-large-v1:0">Jamba 1.5 Large (Híbrido SSM)</option>
+                            <option value="ai21.jamba-1-5-mini-v1:0">Jamba 1.5 Mini</option>
+                            <option value="ai21.j2-ultra-v1">Jurassic-2 Ultra</option>
+                            <option value="ai21.j2-mid-v1">Jurassic-2 Mid</option>
+                          </optgroup>
                         </select>
                       </div>
                     </div>
@@ -247,7 +316,7 @@ export default function Header() {
                     <div className="flex items-start gap-2 p-2 rounded bg-primary/10 border border-primary/20">
                       <span className="text-xs">💡</span>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        <strong>Tip:</strong> Claude 3 Sonnet es el mejor balance calidad/precio (~$0.10 por flujo).
+                        <strong>Recomendado:</strong> Claude 3.7 Sonnet (mejor razonamiento), Nova Pro (RAG), o Llama 3.2 1B (bajo costo).
                       </p>
                     </div>
                   </div>
