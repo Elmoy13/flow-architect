@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Workflow, Download, FileText } from 'lucide-react';
+import { Settings, Workflow, Download, FileText, Upload, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,7 +21,7 @@ import { useFlowStore } from '@/store/flowStore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Header() {
-  const { apiKey, setApiKey, flowData, yamlContent } = useFlowStore();
+  const { apiKey, setApiKey, flowData, yamlContent, leftPanelMode, setLeftPanelMode } = useFlowStore();
   const { toast } = useToast();
   const [tempKey, setTempKey] = useState(apiKey);
   const [isOpen, setIsOpen] = useState(false);
@@ -71,6 +71,28 @@ export default function Header() {
             Workflow Builder
           </p>
         </div>
+      </div>
+
+      {/* Mode Toggle */}
+      <div className="flex items-center gap-1 bg-muted/30 rounded-lg p-1">
+        <Button
+          variant={leftPanelMode === 'upload' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setLeftPanelMode('upload')}
+          className="gap-2 h-8"
+        >
+          <Upload className="w-4 h-4" />
+          Import Doc
+        </Button>
+        <Button
+          variant={leftPanelMode === 'builder' ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setLeftPanelMode('builder')}
+          className="gap-2 h-8"
+        >
+          <Layers className="w-4 h-4" />
+          Flow Builder
+        </Button>
       </div>
 
       <div className="flex items-center gap-2">

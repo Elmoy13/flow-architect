@@ -158,14 +158,14 @@ export default function StepForm({ stepId }: StepFormProps) {
         <div className="space-y-1.5">
           <Label className="text-xs">Next Step</Label>
           <Select
-            value={step.next_step || ''}
-            onValueChange={(v) => handleFieldChange('next_step', v || undefined)}
+            value={step.next_step || '__END__'}
+            onValueChange={(v) => handleFieldChange('next_step', v === '__END__' ? undefined : v)}
           >
             <SelectTrigger className="text-xs font-mono">
               <SelectValue placeholder="(End of flow)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="" className="text-xs">(End of flow)</SelectItem>
+              <SelectItem value="__END__" className="text-xs">(End of flow)</SelectItem>
               {allStepIds.filter(id => id !== stepId).map((id) => (
                 <SelectItem key={id} value={id} className="text-xs font-mono">
                   {id}
@@ -183,7 +183,7 @@ export default function StepForm({ stepId }: StepFormProps) {
 
 function CollectInformationConfig({ step, onConfigChange }: { step: FlowStep; onConfigChange: (field: string, value: unknown) => void }) {
   const config = step.config;
-  
+
   return (
     <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
       <div className="space-y-1.5">
@@ -226,8 +226,8 @@ function CollectInformationConfig({ step, onConfigChange }: { step: FlowStep; on
           <Label className="text-xs">Options (comma-separated)</Label>
           <Input
             value={config.validation?.options?.join(', ') || ''}
-            onChange={(e) => onConfigChange('validation', { 
-              ...config.validation, 
+            onChange={(e) => onConfigChange('validation', {
+              ...config.validation,
               options: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
             })}
             className="text-xs"
@@ -266,7 +266,7 @@ function EvaluateConditionConfig({ step, onConfigChange, allStepIds }: { step: F
           <Plus className="w-3 h-3" /> Add
         </Button>
       </div>
-      
+
       {conditions.map((condition, index) => (
         <div key={index} className="space-y-2 p-2 bg-background/50 rounded border">
           <div className="grid grid-cols-3 gap-2">
@@ -326,14 +326,14 @@ function EvaluateConditionConfig({ step, onConfigChange, allStepIds }: { step: F
       <div className="space-y-1.5">
         <Label className="text-xs">Default Next Step</Label>
         <Select
-          value={step.config.default_next_step || ''}
-          onValueChange={(v) => onConfigChange('default_next_step', v || undefined)}
+          value={step.config.default_next_step || '__NONE__'}
+          onValueChange={(v) => onConfigChange('default_next_step', v === '__NONE__' ? undefined : v)}
         >
           <SelectTrigger className="text-xs font-mono">
             <SelectValue placeholder="(None)" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="" className="text-xs">(None)</SelectItem>
+            <SelectItem value="__NONE__" className="text-xs">(None)</SelectItem>
             {allStepIds.filter(id => id !== step.step_id).map((id) => (
               <SelectItem key={id} value={id} className="text-xs font-mono">{id}</SelectItem>
             ))}

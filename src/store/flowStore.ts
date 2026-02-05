@@ -41,11 +41,11 @@ export interface StepConfig {
   action_params?: Record<string, unknown>;
 }
 
-export type StepType = 
-  | 'collect_information' 
-  | 'evaluate_condition' 
+export type StepType =
+  | 'collect_information'
+  | 'evaluate_condition'
   | 'decision_point'
-  | 'provide_instructions' 
+  | 'provide_instructions'
   | 'execute_action';
 
 export interface FlowStep {
@@ -80,19 +80,19 @@ interface FlowStore {
   // Flow data (source of truth)
   flowData: FlowData;
   setFlowData: (data: FlowData) => void;
-  
+
   // YAML content (derived from flowData)
   yamlContent: string;
   updateYamlFromFlowData: () => void;
   setYamlContent: (content: string) => void;
-  
+
   // Flow metadata
   updateMetadata: (updates: Partial<Pick<FlowData, 'flow_id' | 'name' | 'version' | 'description'>>) => void;
-  
+
   // Constants management
   setConstant: (key: string, value: string | number | boolean) => void;
   deleteConstant: (key: string) => void;
-  
+
   // Step management
   addStep: (step: FlowStep) => void;
   updateStep: (stepId: string, updates: Partial<FlowStep>) => void;
@@ -100,29 +100,33 @@ interface FlowStore {
   reorderSteps: (stepIds: string[]) => void;
   getStepIds: () => string[];
   getOrphanSteps: () => string[];
-  
+
   // Selected step for editing
   selectedStepId: string | null;
   setSelectedStepId: (id: string | null) => void;
-  
+
   // API Key
   apiKey: string;
   setApiKey: (key: string) => void;
-  
+
+  // Left panel mode
+  leftPanelMode: 'builder' | 'upload';
+  setLeftPanelMode: (mode: 'builder' | 'upload') => void;
+
   // Builder tab
   builderTab: 'metadata' | 'steps';
   setBuilderTab: (tab: 'metadata' | 'steps') => void;
-  
+
   // AI Copilot
   isCopilotOpen: boolean;
   toggleCopilot: () => void;
   chatMessages: ChatMessage[];
   addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
-  
+
   // History
   flowHistory: Array<{ name: string; timestamp: Date }>;
   addToHistory: (name: string) => void;
-  
+
   // Processing state
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
@@ -288,8 +292,8 @@ const DEFAULT_FLOW_DATA: FlowData = {
 
 function flowDataToYaml(data: FlowData): string {
   try {
-    return yaml.dump(data, { 
-      indent: 2, 
+    return yaml.dump(data, {
+      indent: 2,
       lineWidth: -1,
       noRefs: true,
       sortKeys: false
@@ -316,7 +320,7 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
   setFlowData: (data) => {
     set({ flowData: data, yamlContent: flowDataToYaml(data) });
   },
-  
+
   yamlContent: flowDataToYaml(DEFAULT_FLOW_DATA),
   updateYamlFromFlowData: () => {
     const yamlContent = flowDataToYaml(get().flowData);
@@ -330,14 +334,14 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
       set({ yamlContent: content });
     }
   },
-  
+
   // Metadata management
   updateMetadata: (updates) => {
     const { flowData } = get();
     const newFlowData = { ...flowData, ...updates };
     set({ flowData: newFlowData, yamlContent: flowDataToYaml(newFlowData) });
   },
-  
+
   // Constants management
   setConstant: (key, value) => {
     const { flowData } = get();
@@ -352,7 +356,7 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
     const newFlowData = { ...flowData, constants: newConstants };
     set({ flowData: newFlowData, yamlContent: flowDataToYaml(newFlowData) });
   },
-  
+
   // Step management
   addStep: (step) => {
     const { flowData } = get();
@@ -364,7 +368,7 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
     const { flowData } = get();
     const existingStep = flowData.steps[stepId];
     if (!existingStep) return;
-    
+
     const updatedStep = { ...existingStep, ...updates };
     const newSteps = { ...flowData.steps, [stepId]: updatedStep };
     const newFlowData = { ...flowData, steps: newSteps };
@@ -375,8 +379,8 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
     const newSteps = { ...flowData.steps };
     delete newSteps[stepId];
     const newFlowData = { ...flowData, steps: newSteps };
-    set({ 
-      flowData: newFlowData, 
+    set({
+      flowData: newFlowData,
       yamlContent: flowDataToYaml(newFlowData),
       selectedStepId: selectedStepId === stepId ? null : selectedStepId
     });
@@ -397,7 +401,7 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
     const { flowData } = get();
     const stepIds = Object.keys(flowData.steps);
     const referencedSteps = new Set<string>();
-    
+
     // Find all steps that are referenced by other steps
     Object.values(flowData.steps).forEach(step => {
       if (step.next_step) referencedSteps.add(step.next_step);
@@ -405,25 +409,28 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
       step.config.options?.forEach(o => referencedSteps.add(o.next_step));
       if (step.config.default_next_step) referencedSteps.add(step.config.default_next_step);
     });
-    
+
     // First step is never orphan
     const firstStepId = stepIds[0];
-    
+
     return stepIds.filter(id => id !== firstStepId && !referencedSteps.has(id));
   },
-  
+
   selectedStepId: null,
   setSelectedStepId: (id) => set({ selectedStepId: id }),
-  
+
   apiKey: '',
   setApiKey: (key) => set({ apiKey: key }),
-  
+
+  leftPanelMode: 'upload',
+  setLeftPanelMode: (mode) => set({ leftPanelMode: mode }),
+
   builderTab: 'steps',
   setBuilderTab: (tab) => set({ builderTab: tab }),
-  
+
   isCopilotOpen: true,
   toggleCopilot: () => set((state) => ({ isCopilotOpen: !state.isCopilotOpen })),
-  
+
   chatMessages: [],
   addChatMessage: (message) => set((state) => ({
     chatMessages: [
@@ -435,7 +442,7 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
       },
     ],
   })),
-  
+
   flowHistory: [],
   addToHistory: (name) => set((state) => ({
     flowHistory: [
@@ -443,7 +450,7 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
       ...state.flowHistory.slice(0, 9),
     ],
   })),
-  
+
   isProcessing: false,
   setIsProcessing: (processing) => set({ isProcessing: processing }),
 }));
