@@ -98,7 +98,7 @@ export default function Header() {
         </div>
         <div>
           <h1 className="text-lg font-bold tracking-tight">
-            DocFlow <span className="text-primary">Architect</span>
+            KIZUKU <span className="text-primary">Architect</span>
           </h1>
           <p className="text-xs text-muted-foreground">
             Workflow Builder

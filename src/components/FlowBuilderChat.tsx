@@ -250,7 +250,7 @@ export default function FlowBuilderChat() {
                             <Sparkles className="w-5 h-5 text-primary" />
                         </div>
                         <div>
-                            <h2 className="text-sm font-semibold">Agente Agéntico</h2>
+                            <h2 className="text-sm font-semibold">KIZUKU AI</h2>
                             <p className="text-xs text-muted-foreground">
                                 {isAwsConfigured ? '🟢 AI activo' : '🔴 Configurar AI'}
                             </p>
