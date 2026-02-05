@@ -425,6 +425,19 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
   leftPanelMode: 'upload',
   setLeftPanelMode: (mode) => set({ leftPanelMode: mode }),
 
+  awsAccessKey: '',
+  awsSecretKey: '',
+  awsRegion: 'us-east-1',
+  bedrockModelId: 'anthropic.claude-3-sonnet-20240229-v1:0',
+  aiProvider: 'bedrock',
+  setAwsConfig: (config) => set((state) => ({
+    awsAccessKey: config.accessKey ?? state.awsAccessKey,
+    awsSecretKey: config.secretKey ?? state.awsSecretKey,
+    awsRegion: config.region ?? state.awsRegion,
+    bedrockModelId: config.modelId ?? state.bedrockModelId,
+  })),
+  setAiProvider: (provider) => set({ aiProvider: provider }),
+
   builderTab: 'steps',
   setBuilderTab: (tab) => set({ builderTab: tab }),
 
