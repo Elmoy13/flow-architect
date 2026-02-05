@@ -1,5 +1,5 @@
 import yaml from 'js-yaml';
-import type { FlowData, FlowStep } from '@/store/flowStore';
+import type { FlowData, FlowStep, StepType } from '@/store/flowStore';
 
 interface ParsedSection {
   title: string;
@@ -14,7 +14,6 @@ interface ParsedSection {
  */
 export function programmaticParse(rawText: string, fileName: string): { success: boolean; yaml?: string; error?: string } {
   try {
-    // Clean and normalize text
     const cleanText = rawText
       .replace(/\r\n/g, '\n')
       .replace(/\t/g, ' ')
@@ -24,17 +23,14 @@ export function programmaticParse(rawText: string, fileName: string): { success:
       return { success: false, error: 'Document too short to parse' };
     }
 
-    // Try to extract sections/steps from the document
     const sections = extractSections(cleanText);
     
     if (sections.length < 2) {
       return { success: false, error: 'Could not identify enough sections/steps in the document' };
     }
 
-    // Build the flow structure
     const flowData = buildFlowFromSections(sections, fileName);
     
-    // Convert to YAML
     const yamlString = yaml.dump(flowData, {
       indent: 2,
       lineWidth: -1,
@@ -54,14 +50,6 @@ export function programmaticParse(rawText: string, fileName: string): { success:
 function extractSections(text: string): ParsedSection[] {
   const sections: ParsedSection[] = [];
   
-  // Common patterns for section headers
-  const headerPatterns = [
-    /^(?:paso|step|etapa)\s*(\d+)[:\.\-\s]*(.*)/gim,
-    /^(\d+)[\.:\-\)]\s*(.+)/gm,
-    /^[•\-\*]\s*(.+)/gm,
-    /^#{1,3}\s*(.+)/gm,
-  ];
-
   // Try numbered patterns first
   const numberedPattern = /(?:^|\n)(?:(?:paso|step|etapa)\s*)?(\d+)[\.:\-\)\s]+([^\n]+)(?:\n((?:(?!(?:paso|step|etapa)?\s*\d+[\.:\-\)]).)*))?/gi;
   let matches = [...text.matchAll(numberedPattern)];
@@ -136,8 +124,6 @@ function containsQuestion(text: string): boolean {
 }
 
 function extractOptions(text: string): string[] {
-  const options: string[] = [];
-  
   // Look for yes/no patterns
   if (/\b(sí|si|yes)\b.*\b(no)\b/i.test(text) || /\b(no)\b.*\b(sí|si|yes)\b/i.test(text)) {
     return ['Sí', 'No'];
@@ -157,7 +143,7 @@ function extractOptions(text: string): string[] {
     return [orMatch[1].trim(), orMatch[2].trim()].filter(o => o.length < 50);
   }
   
-  return options;
+  return [];
 }
 
 function buildFlowFromSections(sections: ParsedSection[], fileName: string): FlowData {
@@ -175,42 +161,52 @@ function buildFlowFromSections(sections: ParsedSection[], fileName: string): Flo
     const isLast = i === sections.length - 1;
     const nextStepKey = isLast ? undefined : `step_${i + 2}`;
     
-    // Determine step type
-    let type: FlowStep['type'];
-    if (i === 0) {
-      type = 'start';
-    } else if (isLast) {
-      type = 'end';
-    } else if (section.isQuestion && section.options.length >= 2) {
-      type = 'decision';
+    // Determine step type - map to new schema types
+    let type: StepType;
+    if (section.isQuestion && section.options.length >= 2) {
+      type = 'decision_point';
     } else if (section.isQuestion) {
-      type = 'decision';
+      type = 'collect_information';
+    } else if (isLast) {
+      type = 'execute_action';
     } else {
-      type = 'action';
+      type = 'provide_instructions';
     }
     
     const step: FlowStep = {
+      step_id: stepKey,
+      name: section.title.length > 40 ? section.title.substring(0, 40) + '...' : section.title,
       type,
-      label: section.title.length > 40 ? section.title.substring(0, 40) + '...' : section.title,
-      description: section.content || section.title,
+      config: {},
     };
-    
-    if (type === 'decision') {
-      // Create options for decision nodes
-      if (section.options.length >= 2) {
-        step.options = section.options.slice(0, 2).map((opt, idx) => ({
+
+    // Build config based on type
+    if (type === 'decision_point') {
+      step.config = {
+        prompt: section.content || section.title,
+        options: section.options.slice(0, 4).map((opt, idx) => ({
           label: opt,
-          next_step: nextStepKey || stepKey, // Point to next or loop
-        }));
-      } else {
-        // Default yes/no
-        step.options = [
-          { label: 'Sí', next_step: nextStepKey || stepKey },
-          { label: 'No', next_step: nextStepKey || stepKey },
-        ];
-      }
-    } else if (!isLast) {
-      step.next_step = nextStepKey;
+          value: opt.toLowerCase().replace(/\s+/g, '_'),
+          next_step: nextStepKey || stepKey,
+        })),
+      };
+    } else if (type === 'collect_information') {
+      step.config = {
+        prompt: section.content || section.title,
+        field_name: `field_${i + 1}`,
+        validation: { type: 'text' },
+      };
+      if (!isLast) step.next_step = nextStepKey;
+    } else if (type === 'execute_action') {
+      step.config = {
+        action_type: 'close_case',
+      };
+    } else {
+      step.config = {
+        instructions_text: section.content || section.title,
+        confirmation_required: false,
+      };
+      if (!isLast) step.next_step = nextStepKey;
     }
     
     steps[stepKey] = step;
@@ -219,6 +215,7 @@ function buildFlowFromSections(sections: ParsedSection[], fileName: string): Flo
   return {
     flow_id: flowId || 'parsed_flow',
     name: fileName.replace(/\.docx$/i, '') || 'Parsed Flow',
+    version: '1.0.0',
     steps,
   };
 }

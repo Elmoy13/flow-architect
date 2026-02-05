@@ -6,74 +6,33 @@ interface ReactFlowData {
   edges: Edge[];
 }
 
-// Map complex step types to visual types
-function getVisualStepType(step: FlowStep, stepId?: string): 'decision' | 'action' | 'start' | 'end' {
+// Map step types to visual types
+function getVisualStepType(step: FlowStep): 'decision' | 'action' | 'start' | 'end' | 'collect' {
   const type = step.type;
+  const isCloseStep = step.step_id?.toLowerCase().includes('close') || 
+                      step.step_id?.toLowerCase().includes('end') ||
+                      step.name?.toLowerCase().includes('cierre') ||
+                      step.name?.toLowerCase().includes('fin');
 
-  // Check if step name or ID contains "cierre" (closure/end step)
-  const isCierreStep =
-    (step.name && step.name.toLowerCase().includes('cierre')) ||
-    (step.step_id && step.step_id.toLowerCase().includes('close')) ||
-    (stepId && stepId.toLowerCase().includes('close'));
-
-  // If it's a cierre/close step, always show as "end"
-  if (isCierreStep) {
+  if (isCloseStep && type === 'execute_action') {
     return 'end';
   }
 
   switch (type) {
     case 'evaluate_condition':
     case 'decision_point':
-    case 'decision':
       return 'decision';
-
     case 'collect_information':
+      return 'collect';
     case 'provide_instructions':
     case 'execute_action':
-    case 'wait_and_validate':
-    case 'action':
       return 'action';
-
-    case 'start':
-      return 'start';
-
-    case 'end':
-      return 'end';
-
     default:
       return 'action';
   }
 }
 
-// Get label from step (supports both old and new structure)
-function getStepLabel(step: FlowStep): string {
-  return step.name || step.label || 'Unnamed Step';
-}
-
-// Get description from step (supports both old and new structure)
-function getStepDescription(step: FlowStep): string {
-  return step.description || '';
-}
-
-// Extract options from config for decision_point steps
-function getStepOptions(step: FlowStep): Array<{ label: string; next_step: string }> | undefined {
-  // Legacy options
-  if (step.options && step.options.length > 0) {
-    return step.options;
-  }
-
-  // New structure: extract from config
-  if (step.config?.options && step.config.options.length > 0) {
-    return step.config.options.map(opt => ({
-      label: opt.label,
-      next_step: opt.next_step
-    }));
-  }
-
-  return undefined;
-}
-
-// Get all next steps from a step (handles multiple scenarios)
+// Get all next steps from a step
 function getNextSteps(step: FlowStep): Array<{ nextStep: string; label?: string }> {
   const nextSteps: Array<{ nextStep: string; label?: string }> = [];
 
@@ -85,16 +44,6 @@ function getNextSteps(step: FlowStep): Array<{ nextStep: string; label?: string 
   // Options (decision_point)
   if (step.config?.options) {
     step.config.options.forEach(option => {
-      nextSteps.push({
-        nextStep: option.next_step,
-        label: option.label
-      });
-    });
-  }
-
-  // Legacy options
-  if (step.options) {
-    step.options.forEach(option => {
       nextSteps.push({
         nextStep: option.next_step,
         label: option.label
@@ -114,28 +63,12 @@ function getNextSteps(step: FlowStep): Array<{ nextStep: string; label?: string 
       }
     });
 
-    // Default next step for conditions
     if (step.config.default_next_step) {
       nextSteps.push({
         nextStep: step.config.default_next_step,
         label: 'Default'
       });
     }
-  }
-
-  // wait_and_validate specific
-  if (step.config?.success_next_step) {
-    nextSteps.push({
-      nextStep: step.config.success_next_step,
-      label: 'Success'
-    });
-  }
-
-  if (step.config?.failure_next_step) {
-    nextSteps.push({
-      nextStep: step.config.failure_next_step,
-      label: 'Failure'
-    });
   }
 
   return nextSteps;
@@ -150,20 +83,17 @@ export function yamlToReactFlow(flowData: FlowData | null): ReactFlowData {
   const edges: Edge[] = [];
   const stepKeys = Object.keys(flowData.steps);
 
-  // Calculate positions using a simple layout algorithm
+  // Calculate positions using BFS layout
   const HORIZONTAL_SPACING = 320;
   const VERTICAL_SPACING = 180;
 
-  // Create a simple grid layout based on step order and connections
   const positionMap = new Map<string, { x: number; y: number }>();
   const visited = new Set<string>();
-
-  // BFS to determine layout levels
   const levels: string[][] = [];
   const queue: Array<{ stepKey: string; level: number }> = [];
 
-  // Find the first step (use initial_step if available, otherwise first in steps)
-  const firstStep = flowData.initial_step || stepKeys[0];
+  // Start from first step
+  const firstStep = stepKeys[0];
   if (firstStep) {
     queue.push({ stepKey: firstStep, level: 0 });
   }
@@ -182,16 +112,15 @@ export function yamlToReactFlow(flowData: FlowData | null): ReactFlowData {
     const step = flowData.steps[stepKey];
     if (!step) continue;
 
-    // Add all next steps to queue
     const nextSteps = getNextSteps(step);
     nextSteps.forEach(({ nextStep }) => {
-      if (!visited.has(nextStep)) {
+      if (!visited.has(nextStep) && flowData.steps[nextStep]) {
         queue.push({ stepKey: nextStep, level: level + 1 });
       }
     });
   }
 
-  // Add any unvisited steps
+  // Add unvisited steps
   stepKeys.forEach((key) => {
     if (!visited.has(key)) {
       const lastLevel = levels.length;
@@ -202,7 +131,7 @@ export function yamlToReactFlow(flowData: FlowData | null): ReactFlowData {
     }
   });
 
-  // Calculate positions based on levels
+  // Calculate positions
   levels.forEach((levelNodes, levelIndex) => {
     const totalWidth = (levelNodes.length - 1) * HORIZONTAL_SPACING;
     const startX = -totalWidth / 2;
@@ -227,10 +156,11 @@ export function yamlToReactFlow(flowData: FlowData | null): ReactFlowData {
       type: 'flowNode',
       position,
       data: {
-        label: getStepLabel(step),
-        description: getStepDescription(step),
-        stepType: getVisualStepType(step, stepKey),
-        options: getStepOptions(step),
+        label: step.name,
+        stepId: step.step_id,
+        stepType: getVisualStepType(step),
+        type: step.type,
+        config: step.config,
       },
     });
   });
@@ -243,6 +173,8 @@ export function yamlToReactFlow(flowData: FlowData | null): ReactFlowData {
     const nextSteps = getNextSteps(step);
 
     nextSteps.forEach(({ nextStep, label }, idx) => {
+      if (!flowData.steps[nextStep]) return;
+
       const edgeId = label
         ? `${stepKey}-${nextStep}-${idx}`
         : `${stepKey}-${nextStep}`;
