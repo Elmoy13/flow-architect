@@ -153,6 +153,12 @@ interface FlowStore {
   pushFlowHistory: () => void;
   undoLastChange: () => void;
 
+  // Animation Settings
+  animationEnabled: boolean;
+  animationSpeed: 'fast' | 'normal' | 'slow';
+  setAnimationEnabled: (enabled: boolean) => void;
+  setAnimationSpeed: (speed: 'fast' | 'normal' | 'slow') => void;
+
   // History
   flowHistory: Array<{ name: string; timestamp: Date }>;
   addToHistory: (name: string) => void;
@@ -345,6 +351,36 @@ function yamlToFlowData(yamlStr: string): FlowData | null {
   }
 }
 
+// Helper functions for persistent chat
+const CHAT_HISTORY_KEY = 'agentic_chat_history';
+
+function loadPersistedChat(): ChatMessage[] {
+  try {
+    const stored = localStorage.getItem(CHAT_HISTORY_KEY);
+    if (stored) {
+      return JSON.parse(stored).map((msg: any) => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp)
+      }));
+    }
+  } catch (e) {
+    console.error("Failed to load chat history from localStorage", e);
+  }
+  return [];
+}
+
+function savePersistedChat(messages: ChatMessage[]) {
+  try {
+    const messagesToSave = messages.map(msg => ({
+      ...msg,
+      timestamp: msg.timestamp.toISOString()
+    }));
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messagesToSave));
+  } catch (e) {
+    console.error("Failed to save chat history to localStorage", e);
+  }
+}
+
 export const useFlowStore = create<FlowStore>((set, get) => ({
   flowData: DEFAULT_FLOW_DATA,
   setFlowData: (data) => {
@@ -486,33 +522,25 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
     ],
   })),
 
-  // Persistent Agentic Chat with localStorage
-  persistentChatMessages: JSON.parse(localStorage.getItem('agentic_chat_history') || '[]').map((msg: any) => ({
-    ...msg,
-    timestamp: new Date(msg.timestamp)
-  })),
-
-  addPersistentChatMessage: (message) => set((state) => {
-    const newMessage = {
+  // Persistent chat (agentic assistant)
+  persistentChatMessages: loadPersistedChat(),
+  addPersistentChatMessage: (message) => {
+    const newMessage: ChatMessage = {
       ...message,
-      id: crypto.randomUUID(),
+      id: Date.now().toString(),
       timestamp: new Date(),
     };
-    const newMessages = [...state.persistentChatMessages, newMessage];
-
-    // Save to localStorage (keep last 50 messages)
-    const messagesToSave = newMessages.slice(-50).map(msg => ({
-      ...msg,
-      timestamp: msg.timestamp.toISOString()
-    }));
-    localStorage.setItem('agentic_chat_history', JSON.stringify(messagesToSave));
-
-    return { persistentChatMessages: newMessages };
-  }),
-
+    set((state) => {
+      const updated = [...state.persistentChatMessages, newMessage];
+      // Keep only last 50 messages
+      const trimmed = updated.slice(-50);
+      savePersistedChat(trimmed);
+      return { persistentChatMessages: trimmed };
+    });
+  },
   clearChatHistory: () => {
-    localStorage.removeItem('agentic_chat_history');
     set({ persistentChatMessages: [] });
+    savePersistedChat([]);
   },
 
   // Agent Context Tracking
@@ -521,35 +549,42 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
     flowHistory: []
   },
 
-  pushFlowHistory: () => set((state) => {
-    const newHistory = [...state.agentContext.flowHistory, state.flowData];
-    // Keep only last 10 versions
-    const trimmedHistory = newHistory.slice(-10);
-
-    return {
+  pushFlowHistory: () => {
+    const currentFlow = { ...get().flowData };
+    set((state) => ({
       agentContext: {
         ...state.agentContext,
-        flowHistory: trimmedHistory
-      }
-    };
-  }),
+        flowHistory: [...state.agentContext.flowHistory, currentFlow].slice(-10),
+      },
+    }));
+  },
+  undoLastChange: () => {
+    const history = get().agentContext.flowHistory;
+    if (history.length > 0) {
+      const previousFlow = history[history.length - 1];
+      const yamlContent = flowDataToYaml(previousFlow);
+      set({
+        flowData: previousFlow,
+        yamlContent,
+        agentContext: {
+          ...get().agentContext,
+          flowHistory: history.slice(0, -1),
+        },
+      });
+    }
+  },
 
-  undoLastChange: () => set((state) => {
-    const history = state.agentContext.flowHistory;
-    if (history.length === 0) return state;
-
-    const previousFlow = history[history.length - 1];
-    const newHistory = history.slice(0, -1);
-
-    return {
-      flowData: previousFlow,
-      yamlContent: flowDataToYaml(previousFlow),
-      agentContext: {
-        ...state.agentContext,
-        flowHistory: newHistory
-      }
-    };
-  }),
+  // Animation settings
+  animationEnabled: localStorage.getItem('animationEnabled') !== 'false',
+  animationSpeed: (localStorage.getItem('animationSpeed') as 'fast' | 'normal' | 'slow') || 'normal',
+  setAnimationEnabled: (enabled) => {
+    localStorage.setItem('animationEnabled', enabled.toString());
+    set({ animationEnabled: enabled });
+  },
+  setAnimationSpeed: (speed) => {
+    localStorage.setItem('animationSpeed', speed);
+    set({ animationSpeed: speed });
+  },
 
   flowHistory: [],
   addToHistory: (name) => set((state) => ({

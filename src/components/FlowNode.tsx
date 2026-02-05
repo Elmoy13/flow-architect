@@ -1,9 +1,10 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { 
-  GitBranch, 
-  CheckCircle2, 
-  Zap, 
+import { motion } from 'framer-motion';
+import {
+  GitBranch,
+  CheckCircle2,
+  Zap,
   MessageSquare,
   ClipboardList,
   Play
@@ -15,8 +16,30 @@ interface FlowNodeData {
   stepType: 'decision' | 'action' | 'start' | 'end' | 'collect';
   type: string;
   config: Record<string, unknown>;
+  isNew?: boolean;
+  animationDelay?: number;
   [key: string]: unknown;
 }
+
+// Animation variants for node entrance
+const nodeVariants = {
+  hidden: {
+    opacity: 0,
+    scale: 0.5,
+    y: -20,
+  },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 260,
+      damping: 20,
+      duration: 0.4,
+    },
+  },
+};
 
 const FlowNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as FlowNodeData;
@@ -61,29 +84,37 @@ const FlowNode = memo(({ data, selected }: NodeProps) => {
   };
 
   return (
-    <div className={`flow-node ${getNodeStyle()} min-w-[200px] max-w-[280px]`}>
+    <motion.div
+      className={`flow-node ${getNodeStyle()} min-w-[200px] max-w-[280px]`}
+      variants={nodeVariants}
+      initial="hidden"
+      animate="visible"
+      style={{
+        willChange: 'transform, opacity',
+      }}
+    >
       <Handle
         type="target"
         position={Position.Top}
         className="w-3 h-3 !bg-primary !border-2 !border-primary-foreground"
       />
-      
+
       <div className="flex items-center gap-2 mb-2">
         {getIcon()}
         <span className="text-xs font-medium uppercase opacity-70">
           {getTypeLabel()}
         </span>
       </div>
-      
+
       <h3 className="font-semibold text-sm mb-1">{label}</h3>
       <p className="text-xs opacity-60 font-mono">{stepId}</p>
-      
+
       <Handle
         type="source"
         position={Position.Bottom}
         className="w-3 h-3 !bg-primary !border-2 !border-primary-foreground"
       />
-    </div>
+    </motion.div>
   );
 });
 
