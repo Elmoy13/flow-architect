@@ -159,107 +159,135 @@ export default function Header() {
               )}
             </Button>
           </DialogTrigger>
-          <DialogContent className="glass-panel border-border max-w-lg">
+          <DialogContent className="glass-panel border-border max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>Settings</DialogTitle>
               <DialogDescription>
                 Configure tu proveedor de IA para funciones potenciadas con AI.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 pt-4">
-              {/* AI Provider Selection */}
-              <div className="space-y-2">
-                <Label>Proveedor de IA</Label>
-                <select
-                  value={tempAiProvider}
-                  onChange={(e) => setTempAiProvider(e.target.value as 'openai' | 'bedrock')}
-                  className="w-full p-2 rounded-md border bg-background text-sm"
-                >
-                  <option value="bedrock">AWS Bedrock (Recomendado)</option>
-                  <option value="openai">OpenAI</option>
-                </select>
-              </div>
 
-              {/* AWS Bedrock Configuration */}
-              {tempAiProvider === 'bedrock' && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="awsAccessKey">AWS Access Key ID</Label>
-                    <Input
-                      id="awsAccessKey"
-                      type="password"
-                      placeholder="AKIA..."
-                      value={tempAwsAccessKey}
-                      onChange={(e) => setTempAwsAccessKey(e.target.value)}
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="awsSecretKey">AWS Secret Access Key</Label>
-                    <Input
-                      id="awsSecretKey"
-                      type="password"
-                      placeholder="********************"
-                      value={tempAwsSecretKey}
-                      onChange={(e) => setTempAwsSecretKey(e.target.value)}
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="awsRegion">AWS Region</Label>
-                    <Input
-                      id="awsRegion"
-                      placeholder="us-east-1"
-                      value={tempAwsRegion}
-                      onChange={(e) => setTempAwsRegion(e.target.value)}
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bedrockModel">Modelo Bedrock</Label>
-                    <select
-                      id="bedrockModel"
-                      value={tempBedrockModelId}
-                      onChange={(e) => setTempBedrockModelId(e.target.value)}
-                      className="w-full p-2 rounded-md border bg-background text-sm font-mono"
-                    >
-                      <option value="anthropic.claude-3-sonnet-20240229-v1:0">Claude 3 Sonnet (Recomendado)</option>
-                      <option value="anthropic.claude-3-opus-20240229-v1:0">Claude 3 Opus (Premium)</option>
-                      <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku (Rápido)</option>
-                    </select>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    💡 <strong>Tip:</strong> Claude 3 Sonnet es el mejor balance calidad/precio (~$0.10 por flujo).
-                  </p>
-                </>
-              )}
-
-              {/* OpenAI Configuration */}
-              {tempAiProvider === 'openai' && (
+            {/* Scrollable content area */}
+            <div className="flex-1 overflow-y-auto pr-2">
+              <div className="space-y-4 pt-4">
+                {/* AI Provider Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="apiKey">OpenAI API Key</Label>
-                  <Input
-                    id="apiKey"
-                    type="password"
-                    placeholder="sk-xxxxxxxx"
-                    value={tempKey}
-                    onChange={(e) => setTempKey(e.target.value)}
-                    className="font-mono"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Sin API key, el AI Copilot corre en modo simulación.
-                  </p>
+                  <Label>Proveedor de IA</Label>
+                  <select
+                    value={tempAiProvider}
+                    onChange={(e) => setTempAiProvider(e.target.value as 'openai' | 'bedrock')}
+                    className="w-full p-2 rounded-md border bg-background text-sm"
+                  >
+                    <option value="bedrock">AWS Bedrock (Recomendado)</option>
+                    <option value="openai">OpenAI</option>
+                  </select>
                 </div>
-              )}
 
-              <div className="flex gap-2 justify-end pt-2">
-                <Button variant="outline" onClick={() => setIsOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSaveKey}>
-                  Guardar Configuración
-                </Button>
+                {/* AWS Bedrock Configuration */}
+                {tempAiProvider === 'bedrock' && (
+                  <div className="space-y-4 p-3 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-primary"></div>
+                      <span className="text-sm font-medium">Configuración AWS Bedrock</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="awsAccessKey" className="text-xs">AWS Access Key ID</Label>
+                        <Input
+                          id="awsAccessKey"
+                          type="password"
+                          placeholder="AKIA..."
+                          value={tempAwsAccessKey}
+                          onChange={(e) => setTempAwsAccessKey(e.target.value)}
+                          className="font-mono text-xs h-9"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="awsSecretKey" className="text-xs">AWS Secret Access Key</Label>
+                        <Input
+                          id="awsSecretKey"
+                          type="password"
+                          placeholder="********************"
+                          value={tempAwsSecretKey}
+                          onChange={(e) => setTempAwsSecretKey(e.target.value)}
+                          className="font-mono text-xs h-9"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="awsRegion" className="text-xs">AWS Region</Label>
+                        <Input
+                          id="awsRegion"
+                          placeholder="us-east-1"
+                          value={tempAwsRegion}
+                          onChange={(e) => setTempAwsRegion(e.target.value)}
+                          className="font-mono text-xs h-9"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="bedrockModel" className="text-xs">Modelo Bedrock</Label>
+                        <select
+                          id="bedrockModel"
+                          value={tempBedrockModelId}
+                          onChange={(e) => setTempBedrockModelId(e.target.value)}
+                          className="w-full p-2 rounded-md border bg-background text-xs font-mono h-9"
+                        >
+                          <option value="anthropic.claude-3-sonnet-20240229-v1:0">Claude 3 Sonnet</option>
+                          <option value="anthropic.claude-3-opus-20240229-v1:0">Claude 3 Opus</option>
+                          <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 p-2 rounded bg-primary/10 border border-primary/20">
+                      <span className="text-xs">💡</span>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        <strong>Tip:</strong> Claude 3 Sonnet es el mejor balance calidad/precio (~$0.10 por flujo).
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* OpenAI Configuration */}
+                {tempAiProvider === 'openai' && (
+                  <div className="space-y-3 p-3 rounded-lg bg-muted/30 border border-border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-primary"></div>
+                      <span className="text-sm font-medium">Configuración OpenAI</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="apiKey" className="text-xs">OpenAI API Key</Label>
+                      <Input
+                        id="apiKey"
+                        type="password"
+                        placeholder="sk-xxxxxxxx"
+                        value={tempKey}
+                        onChange={(e) => setTempKey(e.target.value)}
+                        className="font-mono text-xs h-9"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Sin API key, el AI Copilot corre en modo simulación.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
+            </div>
+
+            {/* Fixed footer with buttons */}
+            <div className="flex gap-2 justify-end pt-4 border-t border-border">
+              <Button variant="outline" onClick={() => setIsOpen(false)} size="sm">
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveKey} size="sm">
+                Guardar Configuración
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
