@@ -1,24 +1,26 @@
+import { Eye, Code2, Columns } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, Code2, Columns, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useFlowStore } from '@/store/flowStore';
 import FlowVisualizer from './FlowVisualizer';
 import YamlEditor from './YamlEditor';
 import { cn } from '@/lib/utils';
 
+type ViewMode = 'visual' | 'code' | 'split';
+
 export default function MainWorkspace() {
-  const { viewMode, setViewMode, isCopilotOpen, toggleCopilot } = useFlowStore();
+  const [viewMode, setViewMode] = useState<ViewMode>('visual');
 
   const tabs = [
     { id: 'visual' as const, label: 'Visual Flow', icon: Eye },
-    { id: 'code' as const, label: 'Code Editor', icon: Code2 },
-    { id: 'split' as const, label: 'Split View', icon: Columns },
+    { id: 'code' as const, label: 'YAML', icon: Code2 },
+    { id: 'split' as const, label: 'Split', icon: Columns },
   ];
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-full">
       {/* Top Bar with Tabs */}
-      <div className="h-14 border-b border-border flex items-center justify-between px-4 bg-steel-900/50">
+      <div className="h-12 border-b border-border flex items-center px-4 bg-steel-900/50">
         <div className="flex items-center gap-1">
           {tabs.map((tab) => (
             <Button
@@ -27,7 +29,7 @@ export default function MainWorkspace() {
               size="sm"
               onClick={() => setViewMode(tab.id)}
               className={cn(
-                'gap-2 relative',
+                'gap-2 relative h-8',
                 viewMode === tab.id
                   ? 'text-primary bg-primary/10'
                   : 'text-muted-foreground hover:text-foreground'
@@ -44,30 +46,18 @@ export default function MainWorkspace() {
             </Button>
           ))}
         </div>
-
-        {!isCopilotOpen && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleCopilot}
-            className="gap-2"
-          >
-            <Sparkles className="w-4 h-4" />
-            AI Copilot
-          </Button>
-        )}
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
           {viewMode === 'visual' && (
             <motion.div
               key="visual"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full h-full rounded-xl overflow-hidden border border-border bg-steel-950"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full h-full bg-steel-950"
             >
               <FlowVisualizer />
             </motion.div>
@@ -76,10 +66,10 @@ export default function MainWorkspace() {
           {viewMode === 'code' && (
             <motion.div
               key="code"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full h-full"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full h-full p-4"
             >
               <YamlEditor />
             </motion.div>
@@ -88,15 +78,15 @@ export default function MainWorkspace() {
           {viewMode === 'split' && (
             <motion.div
               key="split"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full h-full grid grid-cols-2 gap-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="w-full h-full grid grid-cols-2 gap-0"
             >
-              <div className="rounded-xl overflow-hidden border border-border bg-steel-950">
+              <div className="bg-steel-950 border-r border-border">
                 <FlowVisualizer />
               </div>
-              <div className="h-full">
+              <div className="p-4 overflow-hidden">
                 <YamlEditor />
               </div>
             </motion.div>

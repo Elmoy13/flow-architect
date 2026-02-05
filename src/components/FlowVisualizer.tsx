@@ -18,7 +18,7 @@ const nodeTypes = {
 };
 
 export default function FlowVisualizer() {
-  const { flowData } = useFlowStore();
+  const { flowData, setSelectedStepId, selectedStepId } = useFlowStore();
   
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () => yamlToReactFlow(flowData),
@@ -35,13 +35,23 @@ export default function FlowVisualizer() {
     setEdges(newEdges);
   }, [flowData, setNodes, setEdges]);
 
+  const onNodeClick = useCallback((_: React.MouseEvent, node: { id: string }) => {
+    setSelectedStepId(node.id);
+  }, [setSelectedStepId]);
+
+  const onPaneClick = useCallback(() => {
+    setSelectedStepId(null);
+  }, [setSelectedStepId]);
+
   return (
     <div className="w-full h-full">
       <ReactFlow
-        nodes={nodes}
+        nodes={nodes.map(n => ({ ...n, selected: n.id === selectedStepId }))}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
@@ -65,10 +75,12 @@ export default function FlowVisualizer() {
           zoomable
           className="!bg-steel-900 !border-border !rounded-lg"
           nodeColor={(node) => {
-            const stepType = (node.data as any)?.stepType;
+            const stepType = (node.data as { stepType?: string })?.stepType;
             switch (stepType) {
               case 'decision':
                 return 'hsl(25, 95%, 53%)';
+              case 'collect':
+                return 'hsl(280, 70%, 60%)';
               case 'action':
                 return 'hsl(217, 91%, 60%)';
               case 'start':

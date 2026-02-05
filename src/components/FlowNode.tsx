@@ -1,30 +1,41 @@
 import { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { GitBranch, PlayCircle, CheckCircle2, Zap } from 'lucide-react';
+import { 
+  GitBranch, 
+  CheckCircle2, 
+  Zap, 
+  MessageSquare,
+  ClipboardList,
+  Play
+} from 'lucide-react';
 
 interface FlowNodeData {
   label: string;
-  description: string;
-  stepType: 'decision' | 'action' | 'start' | 'end';
-  options?: Array<{ label: string; next_step: string }>;
+  stepId: string;
+  stepType: 'decision' | 'action' | 'start' | 'end' | 'collect';
+  type: string;
+  config: Record<string, unknown>;
   [key: string]: unknown;
 }
 
-const FlowNode = memo(({ data }: NodeProps) => {
+const FlowNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as FlowNodeData;
-  const { label, description, stepType, options } = nodeData;
+  const { label, stepId, stepType, type } = nodeData;
 
   const getNodeStyle = () => {
+    const baseStyle = selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '';
     switch (stepType) {
       case 'decision':
-        return 'flow-node-decision';
+        return `flow-node-decision ${baseStyle}`;
+      case 'collect':
+        return `flow-node-collect ${baseStyle}`;
       case 'action':
-        return 'flow-node-action';
+        return `flow-node-action ${baseStyle}`;
       case 'start':
       case 'end':
-        return 'flow-node-start';
+        return `flow-node-start ${baseStyle}`;
       default:
-        return 'flow-node-action';
+        return `flow-node-action ${baseStyle}`;
     }
   };
 
@@ -32,30 +43,21 @@ const FlowNode = memo(({ data }: NodeProps) => {
     switch (stepType) {
       case 'decision':
         return <GitBranch className="w-4 h-4" />;
+      case 'collect':
+        return <MessageSquare className="w-4 h-4" />;
       case 'action':
         return <Zap className="w-4 h-4" />;
       case 'start':
-        return <PlayCircle className="w-4 h-4" />;
+        return <Play className="w-4 h-4" />;
       case 'end':
         return <CheckCircle2 className="w-4 h-4" />;
       default:
-        return <Zap className="w-4 h-4" />;
+        return <ClipboardList className="w-4 h-4" />;
     }
   };
 
   const getTypeLabel = () => {
-    switch (stepType) {
-      case 'decision':
-        return 'Decision';
-      case 'action':
-        return 'Action';
-      case 'start':
-        return 'Start';
-      case 'end':
-        return 'End';
-      default:
-        return 'Step';
-    }
+    return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   };
 
   return (
@@ -74,23 +76,7 @@ const FlowNode = memo(({ data }: NodeProps) => {
       </div>
       
       <h3 className="font-semibold text-sm mb-1">{label}</h3>
-      <p className="text-xs opacity-80 leading-relaxed">{description}</p>
-      
-      {options && options.length > 0 && (
-        <div className="mt-3 pt-2 border-t border-current/20">
-          <p className="text-xs opacity-60 mb-1">Options:</p>
-          <div className="flex flex-wrap gap-1">
-            {options.map((opt, idx) => (
-              <span
-                key={idx}
-                className="text-xs px-2 py-0.5 rounded bg-current/10"
-              >
-                {opt.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      <p className="text-xs opacity-60 font-mono">{stepId}</p>
       
       <Handle
         type="source"
