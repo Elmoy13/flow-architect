@@ -80,6 +80,13 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  suggestions?: string[];
+  createdSteps?: string[];
+  analysis?: {
+    problems_found?: string[];
+    improvements?: string[];
+    affected_steps?: string[];
+  };
 }
 
 interface FlowStore {
@@ -123,11 +130,28 @@ interface FlowStore {
   builderTab: 'metadata' | 'steps';
   setBuilderTab: (tab: 'metadata' | 'steps') => void;
 
-  // AI Copilot
+  // AI Copilot (legacy - still used by AICopilot.tsx)
   isCopilotOpen: boolean;
   toggleCopilot: () => void;
   chatMessages: ChatMessage[];
   addChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
+
+  // Persistent Agentic Chat
+  persistentChatMessages: ChatMessage[];
+  addPersistentChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
+  clearChatHistory: () => void;
+
+  // Agent Context Tracking
+  agentContext: {
+    lastModifications: Array<{
+      timestamp: Date;
+      action: string;
+      affectedSteps: string[];
+    }>;
+    flowHistory: FlowData[]; // Keep last versions for undo
+  };
+  pushFlowHistory: () => void;
+  undoLastChange: () => void;
 
   // History
   flowHistory: Array<{ name: string; timestamp: Date }>;
@@ -461,6 +485,71 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
       },
     ],
   })),
+
+  // Persistent Agentic Chat with localStorage
+  persistentChatMessages: JSON.parse(localStorage.getItem('agentic_chat_history') || '[]').map((msg: any) => ({
+    ...msg,
+    timestamp: new Date(msg.timestamp)
+  })),
+
+  addPersistentChatMessage: (message) => set((state) => {
+    const newMessage = {
+      ...message,
+      id: crypto.randomUUID(),
+      timestamp: new Date(),
+    };
+    const newMessages = [...state.persistentChatMessages, newMessage];
+
+    // Save to localStorage (keep last 50 messages)
+    const messagesToSave = newMessages.slice(-50).map(msg => ({
+      ...msg,
+      timestamp: msg.timestamp.toISOString()
+    }));
+    localStorage.setItem('agentic_chat_history', JSON.stringify(messagesToSave));
+
+    return { persistentChatMessages: newMessages };
+  }),
+
+  clearChatHistory: () => {
+    localStorage.removeItem('agentic_chat_history');
+    set({ persistentChatMessages: [] });
+  },
+
+  // Agent Context Tracking
+  agentContext: {
+    lastModifications: [],
+    flowHistory: []
+  },
+
+  pushFlowHistory: () => set((state) => {
+    const newHistory = [...state.agentContext.flowHistory, state.flowData];
+    // Keep only last 10 versions
+    const trimmedHistory = newHistory.slice(-10);
+
+    return {
+      agentContext: {
+        ...state.agentContext,
+        flowHistory: trimmedHistory
+      }
+    };
+  }),
+
+  undoLastChange: () => set((state) => {
+    const history = state.agentContext.flowHistory;
+    if (history.length === 0) return state;
+
+    const previousFlow = history[history.length - 1];
+    const newHistory = history.slice(0, -1);
+
+    return {
+      flowData: previousFlow,
+      yamlContent: flowDataToYaml(previousFlow),
+      agentContext: {
+        ...state.agentContext,
+        flowHistory: newHistory
+      }
+    };
+  }),
 
   flowHistory: [],
   addToHistory: (name) => set((state) => ({

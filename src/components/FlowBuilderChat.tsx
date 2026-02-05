@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
     Send,
@@ -8,7 +8,11 @@ import {
     Loader2,
     CheckCircle2,
     XCircle,
-    Lightbulb
+    Lightbulb,
+    Trash2,
+    Undo2,
+    AlertCircle,
+    TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,49 +20,68 @@ import { useFlowStore } from '@/store/flowStore';
 import { useToast } from '@/hooks/use-toast';
 import { BedrockClient } from '@/lib/bedrock/bedrockClient';
 import { Message } from '@/lib/bedrock/bedrockClient';
-import { parseChatResponse, validateFlowAction, generateStepId } from '@/lib/bedrock/chatToFlowParser';
-import { getFlowBuilderSystemPrompt, getContextualizedPrompt } from '@/lib/bedrock/flowBuilderPrompts';
-
-interface ChatMessage {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: Date;
-    suggestions?: string[];
-    createdSteps?: string[]; // IDs of steps created by this message
-}
+import {
+    parseAgenticResponse,
+    validateAgenticAction,
+    applyAgenticAction,
+    analyzeFlow,
+    AgenticFlowAction
+} from '@/lib/bedrock/agenticFlowParser';
+import {
+    getAgenticSystemPrompt,
+    getAgenticContextualizedPrompt,
+    getSmartSuggestions
+} from '@/lib/bedrock/agenticPrompts';
 
 export default function FlowBuilderChat() {
     const {
         flowData,
         addStep,
         updateStep,
+        deleteStep,
         updateMetadata,
+        setConstant,
         awsAccessKey,
         awsSecretKey,
         awsRegion,
         bedrockModelId,
         aiProvider,
+        persistentChatMessages,
+        addPersistentChatMessage,
+        clearChatHistory,
+        pushFlowHistory,
+        undoLastChange,
+        agentContext
     } = useFlowStore();
 
     const { toast } = useToast();
-    const [messages, setMessages] = useState<ChatMessage[]>([
-        {
-            id: '1',
-            role: 'assistant',
-            content: '¡Hola! 👋 Soy tu asistente para crear flujos de trabajo. Estoy aquí para ayudarte a construir un flujo paso a paso mediante conversación natural.\n\n¿Qué tipo de flujo necesitas crear? Por ejemplo:\n• Atención al cliente\n• Diagnóstico técnico\n• Proceso de ventas\n• Onboarding de usuarios',
-            timestamp: new Date(),
-            suggestions: ['Diagnóstico de internet', 'Atención al cliente', 'Proceso de ventas']
-        }
-    ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [showAnalysis, setShowAnalysis] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Check if AWS is configured
     const isAwsConfigured = awsAccessKey && awsSecretKey && awsRegion;
 
-    const handleSendMessage = async () => {
-        if (!input.trim()) return;
+    // Auto-scroll to bottom
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [persistentChatMessages]);
+
+    // Initial greeting if no messages
+    useEffect(() => {
+        if (persistentChatMessages.length === 0) {
+            addPersistentChatMessage({
+                role: 'assistant',
+                content: '¡Hola! 👋 Soy tu asistente agéntico para crear flujos de trabajo.\n\n✨ Puedo:\n• Crear y modificar pasos\n• Analizar el flujo automáticamente\n• Detectar y reparar problemas\n• Sugerir optimizaciones\n• Recordar toda nuestra conversación\n\n¿Qué tipo de flujo necesitas crear?',
+                suggestions: getSmartSuggestions(flowData)
+            });
+        }
+    }, []);
+
+    const handleSendMessage = async (messageToSend?: string) => {
+        const userInput = messageToSend || input.trim();
+        if (!userInput) return;
 
         // Check configuration
         if (aiProvider === 'bedrock' && !isAwsConfigured) {
@@ -70,16 +93,17 @@ export default function FlowBuilderChat() {
             return;
         }
 
-        const userMessage: ChatMessage = {
-            id: Date.now().toString(),
+        // Add user message
+        addPersistentChatMessage({
             role: 'user',
-            content: input,
-            timestamp: new Date(),
-        };
+            content: userInput,
+        });
 
-        setMessages((prev) => [...prev, userMessage]);
         setInput('');
         setIsLoading(true);
+
+        // Save current flow state for potential undo
+        pushFlowHistory();
 
         try {
             // Create Bedrock client
@@ -93,15 +117,15 @@ export default function FlowBuilderChat() {
             });
 
             // Prepare conversation history
-            const conversationHistory: Message[] = messages.map((msg) => ({
+            const conversationHistory: Message[] = persistentChatMessages.map((msg) => ({
                 role: msg.role,
                 content: msg.content,
             }));
-            conversationHistory.push({ role: 'user', content: input });
+            conversationHistory.push({ role: 'user', content: userInput });
 
-            // Get system prompt with context
-            const systemPrompt = getFlowBuilderSystemPrompt();
-            const contextPrompt = getContextualizedPrompt(input, flowData, conversationHistory);
+            // Get agentic system prompt with full context
+            const systemPrompt = getAgenticSystemPrompt();
+            const contextPrompt = getAgenticContextualizedPrompt(userInput, flowData, conversationHistory);
 
             // Send to Bedrock
             const response = await client.chat(
@@ -109,57 +133,61 @@ export default function FlowBuilderChat() {
                 systemPrompt + contextPrompt
             );
 
-            // Parse response
-            const parsed = parseChatResponse(response.content);
+            // Parse agentic response
+            const parsed = parseAgenticResponse(response.content);
 
             // Apply actions
             const createdSteps: string[] = [];
+            const modifiedSteps: string[] = [];
+            let actionResults: string[] = [];
+
             for (const action of parsed.actions) {
-                if (!validateFlowAction(action)) {
+                if (!validateAgenticAction(action)) {
                     console.warn('Invalid action:', action);
                     continue;
                 }
 
-                switch (action.type) {
-                    case 'add_step':
-                        if (action.data.step) {
-                            const stepId = action.data.step_id || generateStepId(action.data.step.name || 'step');
-                            addStep({ ...action.data.step, step_id: stepId } as any);
-                            createdSteps.push(stepId);
-                        }
-                        break;
+                const result = applyAgenticAction(action, flowData, {
+                    addStep,
+                    updateStep,
+                    deleteStep,
+                    updateMetadata,
+                    setConstant
+                });
 
-                    case 'modify_step':
-                        if (action.data.step_id && action.data.step) {
-                            updateStep(action.data.step_id, action.data.step);
-                        }
-                        break;
+                if (result.success) {
+                    actionResults.push(result.message);
 
-                    case 'update_metadata':
-                        if (action.data.metadata) {
-                            updateMetadata(action.data.metadata);
-                        }
-                        break;
+                    // Track created/modified steps
+                    if (action.type === 'add_step' && action.data.step) {
+                        const stepId = (action.data.step as any).step_id;
+                        if (stepId) createdSteps.push(stepId);
+                    } else if (action.type === 'add_multiple_steps' && action.data.steps) {
+                        const steps = action.data.steps as any[];
+                        steps.forEach(s => {
+                            if (s.step_id) createdSteps.push(s.step_id);
+                        });
+                    } else if (action.type === 'modify_step') {
+                        const stepId = action.data.step_id as string;
+                        if (stepId) modifiedSteps.push(stepId);
+                    }
                 }
             }
 
-            // Add AI response
-            const aiMessage: ChatMessage = {
-                id: Date.now().toString(),
+            // Add AI response with analysis
+            addPersistentChatMessage({
                 role: 'assistant',
                 content: parsed.message,
-                timestamp: new Date(),
                 suggestions: parsed.suggestions,
                 createdSteps: createdSteps.length > 0 ? createdSteps : undefined,
-            };
-
-            setMessages((prev) => [...prev, aiMessage]);
+                analysis: parsed.analysis
+            });
 
             // Show success toast if steps were created
-            if (createdSteps.length > 0) {
+            if (createdSteps.length > 0 || modifiedSteps.length > 0) {
                 toast({
-                    title: '✅ Pasos creados',
-                    description: `Se ${createdSteps.length === 1 ? 'creó' : 'crearon'} ${createdSteps.length} ${createdSteps.length === 1 ? 'paso' : 'pasos'} exitosamente`,
+                    title: '✅ Cambios aplicados',
+                    description: actionResults.join(', '),
                 });
             }
         } catch (error) {
@@ -171,44 +199,108 @@ export default function FlowBuilderChat() {
             });
 
             // Add error message
-            setMessages((prev) => [
-                ...prev,
-                {
-                    id: Date.now().toString(),
-                    role: 'assistant',
-                    content: '❌ Lo siento, hubo un error al procesar tu mensaje. Por favor verifica tu configuración de AWS e intenta nuevamente.',
-                    timestamp: new Date(),
-                },
-            ]);
+            addPersistentChatMessage({
+                role: 'assistant',
+                content: '❌ Lo siento, hubo un error al procesar tu mensaje. Por favor verifica tu configuración de AWS e intenta nuevamente.',
+            });
         } finally {
             setIsLoading(false);
         }
     };
 
+    const handleAnalyzeFlow = () => {
+        const analysis = analyzeFlow(flowData);
+        const problems = [
+            ...analysis.orphaned_steps.map(s => `Paso huérfano: ${s}`),
+            ...analysis.broken_connections.map(c => `Conexión rota: ${c.from} → ${c.to}`)
+        ];
+
+        addPersistentChatMessage({
+            role: 'assistant',
+            content: problems.length > 0
+                ? `🔍 Análisis del flujo:\n\n${problems.join('\n')}\n\n¿Quieres que repare estos problemas?`
+                : '✅ El flujo está en buen estado, no se encontraron problemas.',
+            analysis: {
+                problems_found: problems,
+                affected_steps: [...analysis.orphaned_steps, ...analysis.broken_connections.map(c => c.from)]
+            },
+            suggestions: problems.length > 0 ? ['Reparar automáticamente', 'Ver detalles'] : []
+        });
+    };
+
     const handleSuggestionClick = (suggestion: string) => {
-        setInput(suggestion);
+        handleSendMessage(suggestion);
+    };
+
+    const handleUndo = () => {
+        undoLastChange();
+        toast({
+            title: 'Cambio revertido',
+            description: 'Se restauró la versión anterior del flujo'
+        });
     };
 
     return (
         <div className="w-[400px] h-full glass-panel border-r border-border flex flex-col">
             {/* Header */}
             <div className="p-4 border-b border-border">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/20">
-                        <Sparkles className="w-5 h-5 text-primary" />
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/20">
+                            <Sparkles className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-semibold">Agente Agéntico</h2>
+                            <p className="text-xs text-muted-foreground">
+                                {isAwsConfigured ? '🟢 AI activo' : '🔴 Configurar AI'}
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="text-sm font-semibold">Chat Flow Builder</h2>
-                        <p className="text-xs text-muted-foreground">
-                            {isAwsConfigured ? 'AI activado' : 'Configurar AI'}
-                        </p>
+                    <div className="flex gap-1">
+                        {agentContext.flowHistory.length > 0 && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={handleUndo}
+                                title="Deshacer último cambio"
+                            >
+                                <Undo2 className="w-4 h-4" />
+                            </Button>
+                        )}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                                if (confirm('¿Borrar todo el historial de chat?')) {
+                                    clearChatHistory();
+                                }
+                            }}
+                            title="Limpiar historial"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </Button>
                     </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs flex-1"
+                        onClick={handleAnalyzeFlow}
+                    >
+                        <TrendingUp className="w-3 h-3 mr-1" />
+                        Analizar Flujo
+                    </Button>
                 </div>
             </div>
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message) => (
+                {persistentChatMessages.map((message) => (
                     <motion.div
                         key={message.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -224,11 +316,29 @@ export default function FlowBuilderChat() {
                         <div className={`flex-1 max-w-[280px] ${message.role === 'user' ? 'order-first' : ''}`}>
                             <div
                                 className={`p-3 rounded-lg text-sm ${message.role === 'user'
-                                        ? 'bg-primary text-primary-foreground ml-auto'
-                                        : 'bg-muted'
+                                    ? 'bg-primary text-primary-foreground ml-auto'
+                                    : 'bg-muted'
                                     }`}
                             >
                                 <p className="whitespace-pre-wrap">{message.content}</p>
+
+                                {/* Analysis */}
+                                {message.analysis && (message.analysis.problems_found?.length || message.analysis.improvements?.length) && (
+                                    <div className="mt-2 pt-2 border-t border-border/50 space-y-1">
+                                        {message.analysis.problems_found && message.analysis.problems_found.length > 0 && (
+                                            <div className="flex items-start gap-1 text-xs text-destructive">
+                                                <AlertCircle className="w-3 h-3 mt-0.5" />
+                                                <span>{message.analysis.problems_found.length} problema(s)</span>
+                                            </div>
+                                        )}
+                                        {message.analysis.improvements && message.analysis.improvements.length > 0 && (
+                                            <div className="flex items-start gap-1 text-xs text-node-start">
+                                                <TrendingUp className="w-3 h-3 mt-0.5" />
+                                                <span>{message.analysis.improvements.length} mejora(s)</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Created steps indicator */}
                                 {message.createdSteps && message.createdSteps.length > 0 && (
@@ -248,7 +358,8 @@ export default function FlowBuilderChat() {
                                         <button
                                             key={idx}
                                             onClick={() => handleSuggestionClick(suggestion)}
-                                            className="w-full text-left p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-xs flex items-center gap-2"
+                                            disabled={isLoading}
+                                            className="w-full text-left p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-xs flex items-center gap-2 disabled:opacity-50"
                                         >
                                             <Lightbulb className="w-3 h-3 text-primary" />
                                             {suggestion}
@@ -283,6 +394,8 @@ export default function FlowBuilderChat() {
                         </div>
                     </div>
                 )}
+
+                <div ref={messagesEndRef} />
             </div>
 
             {/* Input */}
@@ -291,7 +404,7 @@ export default function FlowBuilderChat() {
                     <div className="text-center p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
                         <XCircle className="w-5 h-5 text-amber-500 mx-auto mb-1" />
                         <p className="text-xs text-amber-600 dark:text-amber-400">
-                            Configura AWS Bedrock en Settings para usar el chat
+                            Configura AWS Bedrock en Settings para usar el agente
                         </p>
                     </div>
                 ) : (
@@ -310,7 +423,7 @@ export default function FlowBuilderChat() {
                             disabled={isLoading}
                         />
                         <Button
-                            onClick={handleSendMessage}
+                            onClick={() => handleSendMessage()}
                             disabled={isLoading || !input.trim()}
                             size="icon"
                             className="shrink-0"
