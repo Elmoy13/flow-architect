@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import mammoth from 'mammoth';
 import { programmaticParse } from '@/lib/programmaticParser';
 import { parseWithOpenAI } from '@/lib/openaiParser';
+import { parseWithBedrock } from '@/lib/bedrockDocumentParser';
 
 export default function Sidebar() {
     const {
@@ -25,7 +26,12 @@ export default function Sidebar() {
         isProcessing,
         setIsProcessing,
         flowData,
-        apiKey
+        apiKey,
+        awsAccessKey,
+        awsSecretKey,
+        awsRegion,
+        bedrockModelId,
+        aiProvider
     } = useFlowStore();
 
     const { toast } = useToast();
@@ -105,38 +111,103 @@ export default function Sidebar() {
                 return;
             }
 
-            // STEP 2: Programmatic failed, try OpenAI if we have a key
-            if (apiKey && apiKey.length > 10 && !apiKey.includes('xxxxxxxx')) {
+            // STEP 2: Programmatic failed, check if Bedrock is configured
+            const isBedrockConfigured = awsAccessKey && awsSecretKey && awsRegion;
+            const isOpenAIConfigured = apiKey && apiKey.length > 10 && !apiKey.includes('xxxxxxxx');
+
+            // Try Bedrock first if configured (recommended)
+            if (isBedrockConfigured) {
                 toast({
                     title: 'Rule-based parsing failed',
-                    description: 'Trying AI conversion...',
+                    description: 'Trying AI conversion with Bedrock...',
                 });
 
-                const aiResult = await parseWithOpenAI(rawText, file.name, apiKey);
+                const bedrockResult = await parseWithBedrock(rawText, file.name, {
+                    accessKey: awsAccessKey,
+                    secretKey: awsSecretKey,
+                    region: awsRegion,
+                    modelId: bedrockModelId,
+                });
 
-                if (aiResult.success && aiResult.yaml) {
+                if (bedrockResult.success && bedrockResult.yaml) {
                     toast({
                         title: '✨ AI conversion successful',
-                        description: 'Document converted using OpenAI',
+                        description: 'Document converted using AWS Bedrock (Claude)',
                     });
                     addToHistory(file.name);
-                    setYamlContent(aiResult.yaml);
+                    setYamlContent(bedrockResult.yaml);
                     return;
                 }
 
-                // AI also failed
+                // Bedrock failed, try OpenAI as fallback if available
+                if (isOpenAIConfigured) {
+                    toast({
+                        title: 'Bedrock conversion failed',
+                        description: 'Trying OpenAI as fallback...',
+                    });
+
+                    const openaiResult = await parseWithOpenAI(rawText, file.name, apiKey);
+
+                    if (openaiResult.success && openaiResult.yaml) {
+                        toast({
+                            title: '✨ AI conversion successful',
+                            description: 'Document converted using OpenAI',
+                        });
+                        addToHistory(file.name);
+                        setYamlContent(openaiResult.yaml);
+                        return;
+                    }
+
+                    // Both AI methods failed
+                    toast({
+                        title: 'AI conversion failed',
+                        description: openaiResult.error || 'Could not parse document with AI',
+                        variant: 'destructive',
+                    });
+                    return;
+                }
+
+                // Only Bedrock was available and it failed
                 toast({
                     title: 'AI conversion failed',
-                    description: aiResult.error || 'Could not parse document with AI',
+                    description: bedrockResult.error || 'Could not parse document with Bedrock',
                     variant: 'destructive',
                 });
                 return;
             }
 
-            // STEP 3: No valid API key and programmatic failed
+            // STEP 3: Bedrock not configured, try OpenAI if available
+            if (isOpenAIConfigured) {
+                toast({
+                    title: 'Rule-based parsing failed',
+                    description: 'Trying AI conversion with OpenAI...',
+                });
+
+                const openaiResult = await parseWithOpenAI(rawText, file.name, apiKey);
+
+                if (openaiResult.success && openaiResult.yaml) {
+                    toast({
+                        title: '✨ AI conversion successful',
+                        description: 'Document converted using OpenAI',
+                    });
+                    addToHistory(file.name);
+                    setYamlContent(openaiResult.yaml);
+                    return;
+                }
+
+                // OpenAI failed
+                toast({
+                    title: 'AI conversion failed',
+                    description: openaiResult.error || 'Could not parse document with AI',
+                    variant: 'destructive',
+                });
+                return;
+            }
+
+            // STEP 4: No AI provider configured and programmatic failed
             toast({
                 title: 'Conversion failed',
-                description: `${programmaticResult.error || 'Could not parse document structure'}. Add an OpenAI API key to try AI-powered conversion.`,
+                description: `${programmaticResult.error || 'Could not parse document structure'}. Configure AWS Bedrock or OpenAI in Settings to enable AI-powered conversion.`,
                 variant: 'destructive',
             });
         } catch (error) {

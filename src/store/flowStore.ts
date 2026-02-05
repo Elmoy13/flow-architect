@@ -65,8 +65,14 @@ export interface FlowData {
   name: string;
   version: string;
   description?: string;
+  language?: string;
+  keywords?: string[];
+  initial_step?: string;
   constants?: FlowConstants;
   steps: Record<string, FlowStep>;
+  registration_templates?: Record<string, string>;
+  escalation_rules?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ChatMessage {
