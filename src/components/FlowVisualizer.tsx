@@ -19,8 +19,10 @@ import { yamlToReactFlow } from '@/lib/yamlToReactFlow';
 import FlowNode from './FlowNode';
 import QuickEditModal from './QuickEditModal';
 import NodeContextMenu from './NodeContextMenu';
+import SelectionToolbar from './SelectionToolbar';
 import { useFlowAnimation } from '@/hooks/useFlowAnimation';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useMultiSelect } from '@/hooks/useMultiSelect';
 
 const nodeTypes = {
   flowNode: FlowNode,
@@ -31,6 +33,10 @@ function FlowCanvas() {
 
   // Keyboard shortcuts
   useKeyboardShortcuts();
+
+  // Multi-select
+  const multiSelect = useMultiSelect();
+
   const [quickEditStepId, setQuickEditStepId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const prevFlowDataRef = useRef(flowData);
@@ -66,9 +72,20 @@ function FlowCanvas() {
     prevFlowDataRef.current = flowData;
   }, [flowData, setNodes, setEdges, startAnimation]);
 
-  const onNodeClick = useCallback((_: React.MouseEvent, node: { id: string }) => {
-    setSelectedStepId(node.id);
-  }, [setSelectedStepId]);
+  const onNodeClick = useCallback((event: React.MouseEvent, node: { id: string }) => {
+    // Handle multi-select with Shift/Ctrl
+    if (event.shiftKey) {
+      // Shift+Click: Add to selection
+      multiSelect.addToSelection(node.id);
+    } else if (event.ctrlKey || event.metaKey) {
+      // Ctrl/Cmd+Click: Toggle selection
+      multiSelect.toggleSelection(node.id);
+    } else {
+      // Single click: Select only this node
+      multiSelect.clearSelection();
+      setSelectedStepId(node.id);
+    }
+  }, [setSelectedStepId, multiSelect]);
 
   const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: { id: string }) => {
     setQuickEditStepId(node.id);
@@ -135,9 +152,34 @@ function FlowCanvas() {
         config: defaultConfigs[type] || {},
       });
 
+      // Immediately add the node to React Flow with the exact drop position
+      const stepTypeMap: Record<StepType, 'decision' | 'action' | 'start' | 'end' | 'collect' | 'condition'> = {
+        collect_information: 'collect',
+        decision_point: 'decision',
+        evaluate_condition: 'condition',
+        provide_instructions: 'action',
+        execute_action: 'action',
+      };
+
+      const newNode: Node = {
+        id: stepId,
+        type: 'flowNode',
+        position, // Exact position where user dropped
+        data: {
+          label: nameMap[type] || 'Nuevo Paso',
+          stepId,
+          stepType: stepTypeMap[type],
+          type,
+          config: defaultConfigs[type] || {},
+          isConfigured: false,
+          hasWarning: true,
+        },
+      };
+
+      setNodes((nds) => nds.concat(newNode));
       setSelectedStepId(stepId);
     },
-    [reactFlowInstance, addStep, pushFlowHistory, setSelectedStepId]
+    [reactFlowInstance, addStep, pushFlowHistory, setSelectedStepId, setNodes]
   );
 
   const visibleNodes = isAnimating
@@ -151,7 +193,7 @@ function FlowCanvas() {
   return (
     <>
       <ReactFlow
-        nodes={visibleNodes.map(n => ({ ...n, selected: n.id === selectedStepId }))}
+        nodes={visibleNodes}
         edges={visibleEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -168,6 +210,9 @@ function FlowCanvas() {
         minZoom={0.3}
         maxZoom={1.5}
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+        selectionOnDrag={true}
+        multiSelectionKeyCode={['Control', 'Meta', 'Shift']}
+        deleteKeyCode={null}
         defaultEdgeOptions={{
           type: 'smoothstep',
           animated: true,
@@ -219,6 +264,14 @@ function FlowCanvas() {
         onClose={() => setContextMenu(null)}
         onEdit={(nodeId) => setSelectedStepId(nodeId)}
         onQuickEdit={(nodeId) => setQuickEditStepId(nodeId)}
+      />
+
+      {/* Selection Toolbar */}
+      <SelectionToolbar
+        selectedCount={multiSelect.selectedIds.length}
+        onDuplicate={multiSelect.duplicateSelectedNodes}
+        onDelete={multiSelect.deleteSelectedNodes}
+        position={{ x: 80, y: 80 }}
       />
     </>
   );
