@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useFlowStore } from '@/store/flowStore';
 import { useToast } from '@/hooks/use-toast';
+import { useReactFlow, Node } from '@xyflow/react';
 
 /**
  * Custom hook for keyboard shortcuts in the flow builder
@@ -17,6 +18,7 @@ export function useKeyboardShortcuts() {
         agentContext
     } = useFlowStore();
     const { toast } = useToast();
+    const { getNodes, setNodes } = useReactFlow();
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,9 +35,14 @@ export function useKeyboardShortcuts() {
             if (cmdOrCtrl && e.key === 'c' && selectedStepId) {
                 e.preventDefault();
                 const step = flowData.steps[selectedStepId];
-                if (step) {
-                    // Store in clipboard (localStorage for simplicity)
-                    localStorage.setItem('flow_builder_clipboard', JSON.stringify(step));
+                const node = getNodes().find(n => n.id === selectedStepId);
+                if (step && node) {
+                    // Store both step data and visual position
+                    localStorage.setItem('flow_builder_clipboard', JSON.stringify({
+                        step,
+                        position: node.position,
+                        nodeData: node.data
+                    }));
                     toast({
                         title: 'Node copied',
                         description: `"${step.name}" copied to clipboard`,
@@ -49,16 +56,33 @@ export function useKeyboardShortcuts() {
                 const clipboardData = localStorage.getItem('flow_builder_clipboard');
                 if (clipboardData) {
                     try {
-                        const copiedStep = JSON.parse(clipboardData);
-                        const newStepId = `${copiedStep.step_id}_copy_${Date.now()}`;
+                        const copied = JSON.parse(clipboardData);
+                        const newStepId = `step_${Date.now()}`;
                         const newStep = {
-                            ...copiedStep,
+                            ...copied.step,
                             step_id: newStepId,
-                            name: `${copiedStep.name} (Copy)`,
+                            name: `${copied.step.name} (Copy)`,
                         };
 
                         pushFlowHistory();
                         addStep(newStep);
+
+                        // Add visual node with offset position
+                        const newNode: Node = {
+                            id: newStepId,
+                            type: 'flowNode',
+                            position: {
+                                x: copied.position.x + 50,
+                                y: copied.position.y + 50,
+                            },
+                            data: {
+                                ...copied.nodeData,
+                                label: newStep.name,
+                                stepId: newStepId,
+                            },
+                        };
+
+                        setNodes((nds) => nds.concat(newNode));
 
                         toast({
                             title: 'Node pasted',
@@ -74,8 +98,9 @@ export function useKeyboardShortcuts() {
             if (cmdOrCtrl && e.key === 'd' && selectedStepId) {
                 e.preventDefault();
                 const step = flowData.steps[selectedStepId];
-                if (step) {
-                    const newStepId = `${step.step_id}_duplicate_${Date.now()}`;
+                const node = getNodes().find(n => n.id === selectedStepId);
+                if (step && node) {
+                    const newStepId = `step_${Date.now()}`;
                     const newStep = {
                         ...step,
                         step_id: newStepId,
@@ -84,6 +109,23 @@ export function useKeyboardShortcuts() {
 
                     pushFlowHistory();
                     addStep(newStep);
+
+                    // Add visual node with offset position
+                    const newNode: Node = {
+                        id: newStepId,
+                        type: 'flowNode',
+                        position: {
+                            x: node.position.x + 50,
+                            y: node.position.y + 50,
+                        },
+                        data: {
+                            ...node.data,
+                            label: newStep.name,
+                            stepId: newStepId,
+                        },
+                    };
+
+                    setNodes((nds) => nds.concat(newNode));
 
                     toast({
                         title: 'Node duplicated',
@@ -128,5 +170,5 @@ export function useKeyboardShortcuts() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedStepId, flowData, addStep, deleteStep, updateStep, pushFlowHistory, undoLastChange, agentContext, toast]);
+    }, [selectedStepId, flowData, addStep, deleteStep, updateStep, pushFlowHistory, undoLastChange, agentContext, toast, getNodes, setNodes]);
 }
