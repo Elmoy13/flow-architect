@@ -50,8 +50,8 @@ function FlowCanvas() {
   // Track last click position for paste
   const lastClickPosRef = useRef<{ x: number; y: number }>({ x: 100, y: 100 });
 
-  // Track manually added nodes that should NEVER be regenerated
-  const manualNodesRef = useRef<Set<string>>(new Set());
+  // Flag to skip next useEffect execution (prevents race condition when manually adding nodes)
+  const skipNextUpdateRef = useRef(false);
 
   // Expose auto-layout globally for Header to use
   useEffect(() => {
@@ -61,10 +61,11 @@ function FlowCanvas() {
     };
   }, [autoLayout]);
 
-  // Expose last click position for keyboard shortcuts
+  // Expose last click position and skip flag for keyboard shortcuts
   useEffect(() => {
     (window as any).__lastClickPos = lastClickPosRef;
     (window as any).__reactFlowInstance = reactFlowInstance;
+    (window as any).__skipNextUpdate = skipNextUpdateRef;
   }, [reactFlowInstance]);
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
@@ -83,6 +84,13 @@ function FlowCanvas() {
   });
 
   useEffect(() => {
+    // Skip this update if manually adding node (prevents race condition)
+    if (skipNextUpdateRef.current) {
+      skipNextUpdateRef.current = false;
+      prevFlowDataRef.current = flowData;
+      return;
+    }
+
     // Build position map from current nodes
     const positionMap = new Map(
       nodes.map(n => [n.id, n.position])

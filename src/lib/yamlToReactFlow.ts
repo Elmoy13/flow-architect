@@ -74,11 +74,14 @@ export function yamlToReactFlow(
 
     // Use existing position if available, otherwise calculate
     let position: { x: number; y: number };
+    let x: number;
+
     if (existingPositions?.has(step.step_id)) {
       position = existingPositions.get(step.step_id)!;
+      x = position.x;
     } else {
       // Calculate position automatically
-      const x = parentX + (level * 350);
+      x = parentX + (level * 350);
       const y = nodes.filter(n => Math.abs((n.position?.x || 0) - x) < 100).length * 140;
       position = { x, y };
     }

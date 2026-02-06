@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useFlowStore } from '@/store/flowStore';
+import type { FlowStep } from '@/store/flowStore';
 import { useToast } from '@/hooks/use-toast';
 import { useReactFlow, Node } from '@xyflow/react';
 
