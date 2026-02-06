@@ -151,6 +151,14 @@ export function yamlToReactFlow(flowData: FlowData | null): ReactFlowData {
 
     const position = positionMap.get(stepKey) || { x: 0, y: 0 };
 
+    // Generate config summary
+    let configSummary = '';
+    if (step.config.prompt) configSummary = step.config.prompt.substring(0, 60);
+    else if (step.config.instructions_text) configSummary = step.config.instructions_text.substring(0, 60);
+    else if (step.config.field_name) configSummary = `Input: ${step.config.field_name}`;
+    else if (step.config.action_type) configSummary = `Action: ${step.config.action_type}`;
+    else if (step.config.conditions?.length) configSummary = `${step.config.conditions.length} condition(s)`;
+
     nodes.push({
       id: stepKey,
       type: 'flowNode',
@@ -161,6 +169,7 @@ export function yamlToReactFlow(flowData: FlowData | null): ReactFlowData {
         stepType: getVisualStepType(step),
         type: step.type,
         config: step.config,
+        configSummary,
       },
     });
   });

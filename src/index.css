@@ -319,3 +319,21 @@
   fill: hsl(var(--electric-blue)) !important;
   stroke: hsl(var(--electric-blue)) !important;
 }
+
+/* Animated edges - marching ants */
+.react-flow__edge-path {
+  stroke-dasharray: 5 5 !important;
+  animation: dash-flow 1s linear infinite !important;
+}
+
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* Smooth edge labels */
+.react-flow__edge-textbg {
+  rx: 4 !important;
+  ry: 4 !important;
+}
