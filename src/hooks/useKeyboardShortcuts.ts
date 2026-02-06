@@ -58,13 +58,20 @@ export function useKeyboardShortcuts() {
                     try {
                         const copied = JSON.parse(clipboardData);
                         const newStepId = `step_${Date.now()}`;
-                        const newStep = {
-                            ...copied.step,
+
+                        const newStep: FlowStep = {
                             step_id: newStepId,
-                            name: `${copied.step.name} (Copy)`,
+                            name: copied.step.name + ' (Copy)',
+                            type: copied.step.type,
+                            config: copied.step.config,
                         };
 
                         pushFlowHistory();
+
+                        // Set skip flag to prevent useEffect race condition
+                        const skipRef = (window as any).__skipNextUpdate?.current;
+                        if (skipRef !== undefined) skipRef.current = true;
+
                         addStep(newStep);
 
                         // Use last click position on canvas (from window global)
@@ -104,13 +111,19 @@ export function useKeyboardShortcuts() {
                 const node = getNodes().find(n => n.id === selectedStepId);
                 if (step && node) {
                     const newStepId = `step_${Date.now()}`;
-                    const newStep = {
-                        ...step,
+                    const newStep: FlowStep = {
                         step_id: newStepId,
-                        name: `${step.name} (Copy)`,
+                        name: node.data.label + ' (Copy)',
+                        type: node.data.type,
+                        config: node.data.config,
                     };
 
                     pushFlowHistory();
+
+                    // Set skip flag to prevent useEffect race condition
+                    const skipRef = (window as any).__skipNextUpdate?.current;
+                    if (skipRef !== undefined) skipRef.current = true;
+
                     addStep(newStep);
 
                     // Add visual node with offset (next to original)

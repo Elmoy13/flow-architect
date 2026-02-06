@@ -168,6 +168,10 @@ function FlowCanvas() {
 
       pushFlowHistory();
 
+      // CRITICAL: Set flag to skip next useEffect update
+      // This prevents race condition where useEffect runs with stale nodes state
+      skipNextUpdateRef.current = true;
+
       const stepId = `step_${Date.now()}`;
       const nameMap: Record<StepType, string> = {
         collect_information: 'Nuevo Collect',
