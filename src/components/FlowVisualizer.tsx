@@ -76,13 +76,26 @@ function FlowCanvas() {
     const isNewFlow = prevStepCount !== currStepCount || prevFlowDataRef.current.flow_id !== flowData.flow_id;
 
     if (isNewFlow && newNodes.length > 0) {
-      startAnimation(newNodes, newEdges);
+      // Only update if this is a completely new flow or nodes don't exist yet
+      // Don't overwrite manually placed nodes
+      const existingNodeIds = new Set(nodes.map(n => n.id));
+      const hasNewNodes = newNodes.some(n => !existingNodeIds.has(n.id));
+
+      if (hasNewNodes || nodes.length === 0) {
+        // Merge: keep existing node positions, add new ones with generated positions
+        const mergedNodes = newNodes.map(newNode => {
+          const existing = nodes.find(n => n.id === newNode.id);
+          return existing ? { ...newNode, position: existing.position } : newNode;
+        });
+
+        setNodes(mergedNodes);
+        setEdges(newEdges);
+        startAnimation(mergedNodes, newEdges);
+      }
     }
 
-    setNodes(newNodes);
-    setEdges(newEdges);
     prevFlowDataRef.current = flowData;
-  }, [flowData, setNodes, setEdges, startAnimation]);
+  }, [flowData, setNodes, setEdges, startAnimation, nodes]);
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: { id: string }) => {
     // Handle multi-select with Shift/Ctrl
@@ -131,8 +144,9 @@ function FlowCanvas() {
     (event: React.DragEvent) => {
       event.preventDefault();
       const type = event.dataTransfer.getData('application/reactflow') as StepType;
-      if (!type) return;
+      if (!type || !reactFlowInstance) return;
 
+      // Get exact drop position using reactFlowInstance
       const position = reactFlowInstance.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
@@ -176,7 +190,7 @@ function FlowCanvas() {
       const newNode: Node = {
         id: stepId,
         type: 'flowNode',
-        position, // Exact position where user dropped
+        position, // Exact position from screenToFlowPosition
         data: {
           label: nameMap[type] || 'Nuevo Paso',
           stepId,
@@ -188,6 +202,7 @@ function FlowCanvas() {
         },
       };
 
+      // Add node directly to React Flow
       setNodes((nds) => nds.concat(newNode));
       setSelectedStepId(stepId);
     },
