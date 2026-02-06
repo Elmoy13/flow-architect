@@ -105,51 +105,6 @@ export function useKeyboardShortcuts() {
                 }
             }
 
-            // Cmd/Ctrl + D: Duplicate selected node
-            if (cmdOrCtrl && e.key === 'd' && selectedStepId) {
-                e.preventDefault();
-                const step = flowData.steps[selectedStepId];
-                const node = getNodes().find(n => n.id === selectedStepId);
-                if (step && node) {
-                    const newStepId = `step_${Date.now()}`;
-                    const newStep: FlowStep = {
-                        step_id: newStepId,
-                        name: node.data.label + ' (Copy)',
-                        type: node.data.type,
-                        config: node.data.config,
-                    };
-
-                    pushFlowHistory();
-
-                    // Set skip flag to prevent useEffect race condition
-                    const skipRef = (window as any).__skipNextUpdate?.current;
-                    if (skipRef !== undefined) skipRef.current = true;
-
-                    addStep(newStep);
-
-                    // Add visual node with offset (next to original)
-                    const newNode: Node = {
-                        id: newStepId,
-                        type: 'flowNode',
-                        position: {
-                            x: node.position.x + 50,
-                            y: node.position.y + 50,
-                        },
-                        data: {
-                            ...node.data,
-                            label: newStep.name,
-                            stepId: newStepId,
-                        },
-                    };
-
-                    setNodes((nds) => nds.concat(newNode));
-
-                    toast({
-                        title: 'Node duplicated',
-                        description: `Created "${newStep.name}" next to original`,
-                    });
-                }
-            }
 
             // Cmd/Ctrl + Z: Undo
             if (cmdOrCtrl && e.key === 'z' && !e.shiftKey) {
@@ -159,21 +114,6 @@ export function useKeyboardShortcuts() {
                     toast({
                         title: 'Undo',
                         description: 'Reverted to previous state',
-                    });
-                }
-            }
-
-            // Delete: Delete selected node
-            if (e.key === 'Delete' && selectedStepId) {
-                e.preventDefault();
-                const step = flowData.steps[selectedStepId];
-                if (step) {
-                    pushFlowHistory();
-                    deleteStep(selectedStepId);
-                    toast({
-                        title: 'Node deleted',
-                        description: `"${step.name}" removed from flow`,
-                        variant: 'destructive',
                     });
                 }
             }

@@ -72,11 +72,19 @@ export function useMultiSelect() {
         pushFlowHistory();
         const nodesToDuplicate = selectedNodes;
 
+        // Get skipNextUpdate ref
+        const skipRef = (window as any).__skipNextUpdate;
+
         nodesToDuplicate.forEach((node, index) => {
             const stepId = `step_${Date.now()}_${index}`;
             const step = flowData.steps[node.id];
 
             if (!step) return;
+
+            // Set skip flag BEFORE addStep
+            if (skipRef?.current !== undefined) {
+                skipRef.current = true;
+            }
 
             // Add to flow store
             addStep({
@@ -121,13 +129,13 @@ export function useMultiSelect() {
             const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
             const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
-            // Delete selected nodes
+            // Delete selected nodes (works for both single and multiple)
             if (e.key === 'Delete' && selectedIds.length > 0) {
                 e.preventDefault();
                 deleteSelectedNodes();
             }
 
-            // Duplicate selected nodes (Ctrl/Cmd+D)
+            // Duplicate selected nodes (Ctrl/Cmd+D) - works for both single and multiple
             if (cmdOrCtrl && e.key === 'd' && selectedIds.length > 0) {
                 e.preventDefault();
                 duplicateSelectedNodes();
