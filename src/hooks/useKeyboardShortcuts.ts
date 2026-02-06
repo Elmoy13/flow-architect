@@ -33,20 +33,35 @@ export function useKeyboardShortcuts() {
             }
 
             // Cmd/Ctrl + C: Copy node
-            if (cmdOrCtrl && e.key === 'c' && selectedStepId) {
+            if (cmdOrCtrl && e.key === 'c') {
                 e.preventDefault();
-                const step = flowData.steps[selectedStepId];
-                const node = getNodes().find(n => n.id === selectedStepId);
-                if (step && node) {
+
+                // Try selectedStepId first, then fall back to React Flow selection
+                let nodeToCopy = null;
+                let stepToCopy = null;
+
+                if (selectedStepId) {
+                    stepToCopy = flowData.steps[selectedStepId];
+                    nodeToCopy = getNodes().find(n => n.id === selectedStepId);
+                } else {
+                    // Check React Flow selection
+                    const selectedNodes = getNodes().filter(n => n.selected);
+                    if (selectedNodes.length > 0) {
+                        nodeToCopy = selectedNodes[0];
+                        stepToCopy = flowData.steps[nodeToCopy.id];
+                    }
+                }
+
+                if (stepToCopy && nodeToCopy) {
                     // Store both step data and visual position
                     localStorage.setItem('flow_builder_clipboard', JSON.stringify({
-                        step,
-                        position: node.position,
-                        nodeData: node.data
+                        step: stepToCopy,
+                        position: nodeToCopy.position,
+                        nodeData: nodeToCopy.data
                     }));
                     toast({
                         title: 'Node copied',
-                        description: `"${step.name}" copied to clipboard`,
+                        description: `"${stepToCopy.name}" copied to clipboard`,
                     });
                 }
             }
@@ -58,7 +73,8 @@ export function useKeyboardShortcuts() {
                 if (clipboardData) {
                     try {
                         const copied = JSON.parse(clipboardData);
-                        const newStepId = `step_${Date.now()}`;
+                        const baseTimestamp = Date.now();
+                        const newStepId = `step_${baseTimestamp}`;
 
                         const newStep: FlowStep = {
                             step_id: newStepId,
@@ -70,8 +86,10 @@ export function useKeyboardShortcuts() {
                         pushFlowHistory();
 
                         // Set skip flag to prevent useEffect race condition
-                        const skipRef = (window as any).__skipNextUpdate?.current;
-                        if (skipRef !== undefined) skipRef.current = true;
+                        const skipRef = (window as any).__skipNextUpdate;
+                        if (skipRef?.current !== undefined) {
+                            skipRef.current = true;
+                        }
 
                         addStep(newStep);
 
@@ -101,6 +119,11 @@ export function useKeyboardShortcuts() {
                         });
                     } catch (error) {
                         console.error('Failed to paste:', error);
+                        toast({
+                            title: 'Paste failed',
+                            description: 'Could not paste node',
+                            variant: 'destructive',
+                        });
                     }
                 }
             }
