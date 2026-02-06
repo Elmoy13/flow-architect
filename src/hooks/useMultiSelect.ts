@@ -72,19 +72,21 @@ export function useMultiSelect() {
         pushFlowHistory();
         const nodesToDuplicate = selectedNodes;
 
-        // Get skipNextUpdate ref
+        // Generate base timestamp ONCE to prevent ID collision
+        const baseTimestamp = Date.now();
+
+        // Get skipNextUpdate ref and set it ONCE before loop
         const skipRef = (window as any).__skipNextUpdate;
+        if (skipRef?.current !== undefined) {
+            skipRef.current = true;
+        }
 
         nodesToDuplicate.forEach((node, index) => {
-            const stepId = `step_${Date.now()}_${index}`;
+            // Use baseTimestamp + index for unique IDs
+            const stepId = `step_${baseTimestamp}_${index}`;
             const step = flowData.steps[node.id];
 
             if (!step) return;
-
-            // Set skip flag BEFORE addStep
-            if (skipRef?.current !== undefined) {
-                skipRef.current = true;
-            }
 
             // Add to flow store
             addStep({
@@ -112,8 +114,8 @@ export function useMultiSelect() {
             setNodes((nds) => nds.concat(newNode));
         });
 
-        // Select the new nodes
-        const newIds = nodesToDuplicate.map((_, index) => `step_${Date.now()}_${index}`);
+        // Select the new nodes using same baseTimestamp
+        const newIds = nodesToDuplicate.map((_, index) => `step_${baseTimestamp}_${index}`);
         setTimeout(() => selectNodes(newIds), 50);
     }, [selectedIds, selectedNodes, flowData, addStep, setNodes, selectNodes, pushFlowHistory]);
 

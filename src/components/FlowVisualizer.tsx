@@ -119,11 +119,15 @@ function FlowCanvas() {
       // Ctrl/Cmd+Click: Toggle selection
       multiSelect.toggleSelection(node.id);
     } else {
-      // Single click: Select only this node
-      multiSelect.clearSelection();
+      // Regular click: Select only this node
       setSelectedStepId(node.id);
+      // CRITICAL: Also mark as selected in React Flow so shortcuts work
+      setNodes((nds) => nds.map(n => ({
+        ...n,
+        selected: n.id === node.id
+      })));
     }
-  }, [setSelectedStepId, multiSelect]);
+  }, [setSelectedStepId, multiSelect, setNodes]);
 
   const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: { id: string }) => {
     setQuickEditStepId(node.id);
