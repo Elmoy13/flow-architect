@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect, useRef } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -17,6 +17,7 @@ import '@xyflow/react/dist/style.css';
 import { useFlowStore, StepType } from '@/store/flowStore';
 import { yamlToReactFlow } from '@/lib/yamlToReactFlow';
 import FlowNode from './FlowNode';
+import QuickEditModal from './QuickEditModal';
 import { useFlowAnimation } from '@/hooks/useFlowAnimation';
 
 const nodeTypes = {
@@ -25,6 +26,7 @@ const nodeTypes = {
 
 function FlowCanvas() {
   const { flowData, setSelectedStepId, selectedStepId, animationEnabled, animationSpeed, addStep, pushFlowHistory } = useFlowStore();
+  const [quickEditStepId, setQuickEditStepId] = useState<string | null>(null);
   const prevFlowDataRef = useRef(flowData);
   const reactFlowInstance = useReactFlow();
 
@@ -61,6 +63,10 @@ function FlowCanvas() {
   const onNodeClick = useCallback((_: React.MouseEvent, node: { id: string }) => {
     setSelectedStepId(node.id);
   }, [setSelectedStepId]);
+
+  const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: { id: string }) => {
+    setQuickEditStepId(node.id);
+  }, []);
 
   const onPaneClick = useCallback(() => {
     setSelectedStepId(null);
@@ -127,58 +133,68 @@ function FlowCanvas() {
     : edges;
 
   return (
-    <ReactFlow
-      nodes={visibleNodes.map(n => ({ ...n, selected: n.id === selectedStepId }))}
-      edges={visibleEdges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onNodeClick={onNodeClick}
-      onPaneClick={onPaneClick}
-      onConnect={onConnect}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      nodeTypes={nodeTypes}
-      fitView
-      fitViewOptions={{ padding: 0.2 }}
-      minZoom={0.3}
-      maxZoom={1.5}
-      defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-      defaultEdgeOptions={{
-        type: 'smoothstep',
-        animated: true,
-        style: { stroke: 'hsl(217, 91%, 60%)', strokeWidth: 2 },
-      }}
-    >
-      <Background
-        variant={BackgroundVariant.Dots}
-        gap={20}
-        size={1}
-        color="hsl(217, 33%, 20%)"
-      />
-      <Controls
-        showInteractive={false}
-        className="!bg-steel-850 !border-border !rounded-lg overflow-hidden"
-        position="bottom-left"
-      />
-      <MiniMap
-        nodeStrokeWidth={3}
-        pannable
-        zoomable
-        className="!bg-steel-900 !border-border !rounded-lg"
-        position="bottom-right"
-        nodeColor={(node) => {
-          const stepType = (node.data as { stepType?: string })?.stepType;
-          switch (stepType) {
-            case 'decision': return 'hsl(25, 95%, 53%)';
-            case 'collect': return 'hsl(280, 70%, 60%)';
-            case 'action': return 'hsl(217, 91%, 60%)';
-            case 'start':
-            case 'end': return 'hsl(142, 71%, 45%)';
-            default: return 'hsl(217, 91%, 60%)';
-          }
+    <>
+      <ReactFlow
+        nodes={visibleNodes.map(n => ({ ...n, selected: n.id === selectedStepId }))}
+        edges={visibleEdges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
+        onPaneClick={onPaneClick}
+        onConnect={onConnect}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.3}
+        maxZoom={1.5}
+        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+        defaultEdgeOptions={{
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: 'hsl(217, 91%, 60%)', strokeWidth: 2 },
         }}
+      >
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={20}
+          size={1}
+          color="hsl(217, 33%, 20%)"
+        />
+        <Controls
+          showInteractive={false}
+          className="!bg-steel-850 !border-border !rounded-lg overflow-hidden"
+          position="bottom-left"
+        />
+        <MiniMap
+          nodeStrokeWidth={3}
+          pannable
+          zoomable
+          className="!bg-steel-900 !border-border !rounded-lg"
+          position="bottom-right"
+          nodeColor={(node) => {
+            const stepType = (node.data as { stepType?: string })?.stepType;
+            switch (stepType) {
+              case 'decision': return 'hsl(25, 95%, 53%)';
+              case 'collect': return 'hsl(280, 70%, 60%)';
+              case 'condition': return 'hsl(45, 93%, 47%)';
+              case 'action': return 'hsl(217, 91%, 60%)';
+              case 'start':
+              case 'end': return 'hsl(142, 71%, 45%)';
+              default: return 'hsl(217, 91%, 60%)';
+            }
+          }}
+        />
+      </ReactFlow>
+
+      {/* Quick Edit Modal */}
+      <QuickEditModal
+        stepId={quickEditStepId}
+        onClose={() => setQuickEditStepId(null)}
       />
-    </ReactFlow>
+    </>
   );
 }
 

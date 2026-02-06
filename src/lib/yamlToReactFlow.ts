@@ -1,216 +1,199 @@
-import { Node, Edge, MarkerType } from '@xyflow/react';
 import { FlowData, FlowStep } from '@/store/flowStore';
+import { Node, Edge } from '@xyflow/react';
 
-interface ReactFlowData {
-  nodes: Node[];
-  edges: Edge[];
-}
-
-// Map step types to visual types
-function getVisualStepType(step: FlowStep): 'decision' | 'action' | 'start' | 'end' | 'collect' {
-  const type = step.type;
-  const isCloseStep = step.step_id?.toLowerCase().includes('close') || 
-                      step.step_id?.toLowerCase().includes('end') ||
-                      step.name?.toLowerCase().includes('cierre') ||
-                      step.name?.toLowerCase().includes('fin');
-
-  if (isCloseStep && type === 'execute_action') {
-    return 'end';
-  }
-
-  switch (type) {
-    case 'evaluate_condition':
-    case 'decision_point':
-      return 'decision';
-    case 'collect_information':
-      return 'collect';
-    case 'provide_instructions':
-    case 'execute_action':
-      return 'action';
-    default:
-      return 'action';
-  }
-}
-
-// Get all next steps from a step
-function getNextSteps(step: FlowStep): Array<{ nextStep: string; label?: string }> {
-  const nextSteps: Array<{ nextStep: string; label?: string }> = [];
-
-  // Direct next_step
-  if (step.next_step) {
-    nextSteps.push({ nextStep: step.next_step });
-  }
-
-  // Options (decision_point)
-  if (step.config?.options) {
-    step.config.options.forEach(option => {
-      nextSteps.push({
-        nextStep: option.next_step,
-        label: option.label
-      });
-    });
-  }
-
-  // Conditions (evaluate_condition)
-  if (step.config?.conditions) {
-    step.config.conditions.forEach(condition => {
-      if (condition.next_step) {
-        const label = `${condition.field} ${condition.operator} ${condition.value}`;
-        nextSteps.push({
-          nextStep: condition.next_step,
-          label
-        });
-      }
-    });
-
-    if (step.config.default_next_step) {
-      nextSteps.push({
-        nextStep: step.config.default_next_step,
-        label: 'Default'
-      });
-    }
-  }
-
-  return nextSteps;
-}
-
-export function yamlToReactFlow(flowData: FlowData | null): ReactFlowData {
-  if (!flowData || !flowData.steps) {
-    return { nodes: [], edges: [] };
-  }
-
+export function yamlToReactFlow(flowData: FlowData): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
-  const stepKeys = Object.keys(flowData.steps);
 
-  // Calculate positions using BFS layout
-  const HORIZONTAL_SPACING = 320;
-  const VERTICAL_SPACING = 180;
+  const stepIds = Object.keys(flowData.steps);
+  const processedSteps = new Set<string>();
 
-  const positionMap = new Map<string, { x: number; y: number }>();
-  const visited = new Set<string>();
-  const levels: string[][] = [];
-  const queue: Array<{ stepKey: string; level: number }> = [];
-
-  // Start from first step
-  const firstStep = stepKeys[0];
-  if (firstStep) {
-    queue.push({ stepKey: firstStep, level: 0 });
-  }
-
-  while (queue.length > 0) {
-    const { stepKey, level } = queue.shift()!;
-
-    if (visited.has(stepKey)) continue;
-    visited.add(stepKey);
-
-    if (!levels[level]) {
-      levels[level] = [];
+  // Helper to determine step visual type
+  const getStepType = (step: FlowStep): 'decision' | 'action' | 'start' | 'end' | 'collect' | 'condition' => {
+    if (step.type === 'decision_point') return 'decision';
+    if (step.type === 'collect_information') return 'collect';
+    if (step.type === 'evaluate_condition') return 'condition';
+    if (step.type === 'execute_action') {
+      const actionType = (step.config as any)?.action_type || '';
+      if (actionType.includes('close') || actionType === 'close_case') return 'end';
+      return 'action';
     }
-    levels[level].push(stepKey);
+    if (step.type === 'provide_instructions') return 'action';
 
-    const step = flowData.steps[stepKey];
-    if (!step) continue;
+    // First step is typically start
+    if (stepIds[0] === step.step_id) return 'start';
 
-    const nextSteps = getNextSteps(step);
-    nextSteps.forEach(({ nextStep }) => {
-      if (!visited.has(nextStep) && flowData.steps[nextStep]) {
-        queue.push({ stepKey: nextStep, level: level + 1 });
-      }
-    });
-  }
+    return 'action';
+  };
 
-  // Add unvisited steps
-  stepKeys.forEach((key) => {
-    if (!visited.has(key)) {
-      const lastLevel = levels.length;
-      if (!levels[lastLevel]) {
-        levels[lastLevel] = [];
-      }
-      levels[lastLevel].push(key);
+  // Helper to check if node is configured
+  const isConfigured = (step: FlowStep): boolean => {
+    const c = step.config as Record<string, any>;
+
+    switch (step.type) {
+      case 'collect_information':
+        return !!(c?.prompt && c?.field_name);
+      case 'decision_point':
+        return !!(c?.prompt && c?.options && c.options.length > 0);
+      case 'evaluate_condition':
+        return !!(c?.conditions && c.conditions.length > 0);
+      case 'provide_instructions':
+        return !!c?.instructions_text;
+      case 'execute_action':
+        return !!c?.action_type;
+      default:
+        return false;
     }
-  });
+  };
 
-  // Calculate positions
-  levels.forEach((levelNodes, levelIndex) => {
-    const totalWidth = (levelNodes.length - 1) * HORIZONTAL_SPACING;
-    const startX = -totalWidth / 2;
+  // Helper to get config summary
+  const getConfigSummary = (step: FlowStep): string => {
+    const c = step.config as Record<string, any>;
+    if (c?.prompt) return c.prompt.length > 50 ? c.prompt.substring(0, 50) + '...' : c.prompt;
+    if (c?.instructions_text) {
+      return c.instructions_text.length > 50
+        ? c.instructions_text.substring(0, 50) + '...'
+        : c.instructions_text;
+    }
+    if (c?.field_name) return `Field: ${c.field_name}`;
+    if (c?.action_type) return `Action: ${c.action_type}`;
+    if (c?.conditions?.length) return `${c.conditions.length} condition(s)`;
+    if (c?.options?.length) return `${c.options.length} option(s)`;
+    return '';
+  };
 
-    levelNodes.forEach((stepKey, nodeIndex) => {
-      positionMap.set(stepKey, {
-        x: startX + nodeIndex * HORIZONTAL_SPACING,
-        y: levelIndex * VERTICAL_SPACING,
-      });
-    });
-  });
+  // Recursive DFS to build nodes/edges
+  function processStep(stepId: string, level: number, parentX: number): void {
+    if (processedSteps.has(stepId)) return;
+    processedSteps.add(stepId);
 
-  // Create nodes
-  stepKeys.forEach((stepKey) => {
-    const step = flowData.steps[stepKey];
+    const step = flowData.steps[stepId];
     if (!step) return;
 
-    const position = positionMap.get(stepKey) || { x: 0, y: 0 };
+    const stepType = getStepType(step);
+    const configured = isConfigured(step);
+    const summary = getConfigSummary(step);
 
-    // Generate config summary
-    let configSummary = '';
-    if (step.config.prompt) configSummary = step.config.prompt.substring(0, 60);
-    else if (step.config.instructions_text) configSummary = step.config.instructions_text.substring(0, 60);
-    else if (step.config.field_name) configSummary = `Input: ${step.config.field_name}`;
-    else if (step.config.action_type) configSummary = `Action: ${step.config.action_type}`;
-    else if (step.config.conditions?.length) configSummary = `${step.config.conditions.length} condition(s)`;
+    // Calculate position
+    const x = parentX + (level * 350);
+    const y = nodes.filter(n => Math.abs((n.position?.x || 0) - x) < 100).length * 140;
 
+    // Create node
     nodes.push({
-      id: stepKey,
+      id: step.step_id,
       type: 'flowNode',
-      position,
+      position: { x, y },
       data: {
         label: step.name,
         stepId: step.step_id,
-        stepType: getVisualStepType(step),
+        stepType,
         type: step.type,
         config: step.config,
-        configSummary,
+        configSummary: summary,
+        isConfigured: configured,
+        hasWarning: !configured,
       },
     });
-  });
 
-  // Create edges
-  stepKeys.forEach((stepKey) => {
-    const step = flowData.steps[stepKey];
-    if (!step) return;
-
-    const nextSteps = getNextSteps(step);
-
-    nextSteps.forEach(({ nextStep, label }, idx) => {
-      if (!flowData.steps[nextStep]) return;
-
-      const edgeId = label
-        ? `${stepKey}-${nextStep}-${idx}`
-        : `${stepKey}-${nextStep}`;
-
+    // Handle different connection types
+    if (step.next_step) {
       edges.push({
-        id: edgeId,
-        source: stepKey,
-        target: nextStep,
+        id: `${step.step_id}-${step.next_step}`,
+        source: step.step_id,
+        target: step.next_step,
         type: 'smoothstep',
         animated: true,
-        label: label,
-        labelStyle: label ? {
-          fill: 'hsl(215, 20%, 65%)',
-          fontSize: 11,
-          fontWeight: 500,
-        } : undefined,
-        labelBgStyle: label ? {
-          fill: 'hsl(222, 47%, 8%)',
-          fillOpacity: 0.9,
-        } : undefined,
-        style: { stroke: 'hsl(217, 91%, 60%)', strokeWidth: 2 },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: 'hsl(217, 91%, 60%)',
+      });
+      processStep(step.next_step, level + 1, x);
+    }
+
+    // Decision point options
+    if (step.type === 'decision_point' && step.config.options) {
+      const options = step.config.options as Array<{ label: string; value: string; next_step: string }>;
+      options.forEach((opt, idx) => {
+        if (opt.next_step) {
+          edges.push({
+            id: `${step.step_id}-${opt.next_step}-${idx}`,
+            source: step.step_id,
+            target: opt.next_step,
+            type: 'smoothstep',
+            animated: true,
+            label: opt.label,
+            style: { stroke: 'hsl(25, 95%, 53%)', strokeWidth: 2 },
+          });
+          processStep(opt.next_step, level + 1, x);
+        }
+      });
+    }
+
+    // Evaluate condition
+    if (step.type === 'evaluate_condition') {
+      if (step.config.conditions) {
+        const conditions = step.config.conditions as Array<{ field: string; operator: string; value: any; next_step: string }>;
+        conditions.forEach((cond, idx) => {
+          if (cond.next_step) {
+            edges.push({
+              id: `${step.step_id}-${cond.next_step}-${idx}`,
+              source: step.step_id,
+              target: cond.next_step,
+              type: 'smoothstep',
+              animated: true,
+              label: `${cond.field} ${cond.operator} ${cond.value}`,
+              style: { stroke: 'hsl(45, 93%, 47%)', strokeWidth: 2, strokeDasharray: '5,5' },
+            });
+            processStep(cond.next_step, level + 1, x);
+          }
+        });
+      }
+
+      if (step.config.default_next_step) {
+        const defaultNext = step.config.default_next_step as string;
+        edges.push({
+          id: `${step.step_id}-${defaultNext}-default`,
+          source: step.step_id,
+          target: defaultNext,
+          type: 'smoothstep',
+          animated: true,
+          label: 'Default',
+          style: { stroke: 'hsl(215, 20%, 55%)', strokeWidth: 2 },
+        });
+        processStep(defaultNext, level + 1, x);
+      }
+    }
+  }
+
+  // Start from first step or initial_step
+  const firstStepId = flowData.initial_step || stepIds[0];
+  if (firstStepId) {
+    processStep(firstStepId, 0, 0);
+  }
+
+  // Process any orphaned steps
+  stepIds.forEach((stepId) => {
+    if (!processedSteps.has(stepId)) {
+      const orphanY = nodes.length * 140;
+      const step = flowData.steps[stepId];
+      const stepType = getStepType(step);
+      const configured = isConfigured(step);
+      const summary = getConfigSummary(step);
+
+      nodes.push({
+        id: stepId,
+        type: 'flowNode',
+        position: { x: 800, y: orphanY },
+        data: {
+          label: step.name,
+          stepId: step.step_id,
+          stepType,
+          type: step.type,
+          config: step.config,
+          configSummary: summary,
+          isConfigured: configured,
+          hasWarning: true, // Orphaned nodes always have warning
         },
       });
-    });
+      processedSteps.add(stepId);
+    }
   });
 
   return { nodes, edges };
