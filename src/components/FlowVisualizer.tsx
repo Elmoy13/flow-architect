@@ -61,10 +61,9 @@ function FlowCanvas() {
     };
   }, [autoLayout]);
 
-  // Expose last click position and manual nodes for keyboard shortcuts
+  // Expose last click position for keyboard shortcuts
   useEffect(() => {
     (window as any).__lastClickPos = lastClickPosRef;
-    (window as any).__manualNodes = manualNodesRef;
     (window as any).__reactFlowInstance = reactFlowInstance;
   }, [reactFlowInstance]);
 
@@ -84,37 +83,20 @@ function FlowCanvas() {
   });
 
   useEffect(() => {
-    const { nodes: newNodes, edges: newEdges } = yamlToReactFlow(flowData);
+    // Build position map from current nodes
+    const positionMap = new Map(
+      nodes.map(n => [n.id, n.position])
+    );
+
+    const { nodes: newNodes, edges: newEdges } = yamlToReactFlow(flowData, positionMap);
     const prevStepCount = Object.keys(prevFlowDataRef.current.steps || {}).length;
     const currStepCount = Object.keys(flowData.steps || {}).length;
     const isNewFlow = prevStepCount !== currStepCount || prevFlowDataRef.current.flow_id !== flowData.flow_id;
 
     if (isNewFlow && newNodes.length > 0) {
-      // Get current nodes state directly (not from closure)
-      const currentNodes = nodes;
-
-      // Only update if this is a completely new flow or nodes don't exist yet
-      // Don't overwrite manually placed nodes
-      const existingNodeIds = new Set(currentNodes.map(n => n.id));
-      const hasNewNodes = newNodes.some(n => !existingNodeIds.has(n.id));
-
-      if (hasNewNodes || currentNodes.length === 0) {
-        // Merge: keep existing node positions, SKIP manually added nodes
-        const mergedNodes = newNodes.map(newNode => {
-          // If manually added, keep existing completely (don't regenerate)
-          if (manualNodesRef.current.has(newNode.id)) {
-            const existing = currentNodes.find(n => n.id === newNode.id);
-            return existing || newNode;
-          }
-          // Otherwise merge with existing position if available
-          const existing = currentNodes.find(n => n.id === newNode.id);
-          return existing ? { ...newNode, position: existing.position } : newNode;
-        });
-
-        setNodes(mergedNodes);
-        setEdges(newEdges);
-        startAnimation(mergedNodes, newEdges);
-      }
+      setNodes(newNodes);
+      setEdges(newEdges);
+      startAnimation(newNodes, newEdges);
     }
 
     prevFlowDataRef.current = flowData;
@@ -236,12 +218,6 @@ function FlowCanvas() {
 
       // Add node directly to React Flow
       setNodes((nds) => nds.concat(newNode));
-
-      // Mark as manually added
-      const manualNodes = (window as any).__manualNodes?.current;
-      if (manualNodes) {
-        manualNodes.add(stepId);
-      }
 
       setSelectedStepId(stepId);
     },

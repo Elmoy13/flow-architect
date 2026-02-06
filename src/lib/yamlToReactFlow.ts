@@ -1,7 +1,10 @@
 import { FlowData, FlowStep } from '@/store/flowStore';
 import { Node, Edge } from '@xyflow/react';
 
-export function yamlToReactFlow(flowData: FlowData): { nodes: Node[]; edges: Edge[] } {
+export function yamlToReactFlow(
+  flowData: FlowData,
+  existingPositions?: Map<string, { x: number; y: number }>
+): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
@@ -49,14 +52,9 @@ export function yamlToReactFlow(flowData: FlowData): { nodes: Node[]; edges: Edg
   // Helper to get config summary
   const getConfigSummary = (step: FlowStep): string => {
     const c = step.config as Record<string, any>;
-    if (c?.prompt) return c.prompt.length > 50 ? c.prompt.substring(0, 50) + '...' : c.prompt;
-    if (c?.instructions_text) {
-      return c.instructions_text.length > 50
-        ? c.instructions_text.substring(0, 50) + '...'
-        : c.instructions_text;
-    }
-    if (c?.field_name) return `Field: ${c.field_name}`;
-    if (c?.action_type) return `Action: ${c.action_type}`;
+    if (c?.prompt) return c.prompt.substring(0, 50);
+    if (c?.instructions_text) return c.instructions_text.substring(0, 50);
+    if (c?.action_type) return c.action_type;
     if (c?.conditions?.length) return `${c.conditions.length} condition(s)`;
     if (c?.options?.length) return `${c.options.length} option(s)`;
     return '';
@@ -74,15 +72,22 @@ export function yamlToReactFlow(flowData: FlowData): { nodes: Node[]; edges: Edg
     const configured = isConfigured(step);
     const summary = getConfigSummary(step);
 
-    // Calculate position
-    const x = parentX + (level * 350);
-    const y = nodes.filter(n => Math.abs((n.position?.x || 0) - x) < 100).length * 140;
+    // Use existing position if available, otherwise calculate
+    let position: { x: number; y: number };
+    if (existingPositions?.has(step.step_id)) {
+      position = existingPositions.get(step.step_id)!;
+    } else {
+      // Calculate position automatically
+      const x = parentX + (level * 350);
+      const y = nodes.filter(n => Math.abs((n.position?.x || 0) - x) < 100).length * 140;
+      position = { x, y };
+    }
 
     // Create node
     nodes.push({
       id: step.step_id,
       type: 'flowNode',
-      position: { x, y },
+      position,
       data: {
         label: step.name,
         stepId: step.step_id,
@@ -98,7 +103,7 @@ export function yamlToReactFlow(flowData: FlowData): { nodes: Node[]; edges: Edg
     // Handle different connection types
     if (step.next_step) {
       edges.push({
-        id: `${step.step_id}-${step.next_step}`,
+        id: `${step.step_id} -${step.next_step} `,
         source: step.step_id,
         target: step.next_step,
         type: 'smoothstep',
@@ -113,7 +118,7 @@ export function yamlToReactFlow(flowData: FlowData): { nodes: Node[]; edges: Edg
       options.forEach((opt, idx) => {
         if (opt.next_step) {
           edges.push({
-            id: `${step.step_id}-${opt.next_step}-${idx}`,
+            id: `${step.step_id} -${opt.next_step} -${idx} `,
             source: step.step_id,
             target: opt.next_step,
             type: 'smoothstep',
@@ -133,12 +138,12 @@ export function yamlToReactFlow(flowData: FlowData): { nodes: Node[]; edges: Edg
         conditions.forEach((cond, idx) => {
           if (cond.next_step) {
             edges.push({
-              id: `${step.step_id}-${cond.next_step}-${idx}`,
+              id: `${step.step_id} -${cond.next_step} -${idx} `,
               source: step.step_id,
               target: cond.next_step,
               type: 'smoothstep',
               animated: true,
-              label: `${cond.field} ${cond.operator} ${cond.value}`,
+              label: `${cond.field} ${cond.operator} ${cond.value} `,
               style: { stroke: 'hsl(45, 93%, 47%)', strokeWidth: 2, strokeDasharray: '5,5' },
             });
             processStep(cond.next_step, level + 1, x);
@@ -149,7 +154,7 @@ export function yamlToReactFlow(flowData: FlowData): { nodes: Node[]; edges: Edg
       if (step.config.default_next_step) {
         const defaultNext = step.config.default_next_step as string;
         edges.push({
-          id: `${step.step_id}-${defaultNext}-default`,
+          id: `${step.step_id} -${defaultNext} -default `,
           source: step.step_id,
           target: defaultNext,
           type: 'smoothstep',

@@ -69,7 +69,6 @@ export function useKeyboardShortcuts() {
 
                         // Use last click position on canvas (from window global)
                         const lastClickPos = (window as any).__lastClickPos?.current || { x: 100, y: 100 };
-                        const manualNodes = (window as any).__manualNodes?.current;
 
                         // Add visual node at last click position
                         const newNode: Node = {
@@ -87,11 +86,6 @@ export function useKeyboardShortcuts() {
                         };
 
                         setNodes((nds) => nds.concat(newNode));
-
-                        // Mark as manually added
-                        if (manualNodes) {
-                            manualNodes.add(newStepId);
-                        }
 
                         toast({
                             title: 'Node pasted',
@@ -119,8 +113,6 @@ export function useKeyboardShortcuts() {
                     pushFlowHistory();
                     addStep(newStep);
 
-                    const manualNodes = (window as any).__manualNodes?.current;
-
                     // Add visual node with offset (next to original)
                     const newNode: Node = {
                         id: newStepId,
@@ -137,11 +129,6 @@ export function useKeyboardShortcuts() {
                     };
 
                     setNodes((nds) => nds.concat(newNode));
-
-                    // Mark as manually added
-                    if (manualNodes) {
-                        manualNodes.add(newStepId);
-                    }
 
                     toast({
                         title: 'Node duplicated',
