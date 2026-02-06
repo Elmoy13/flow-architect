@@ -41,6 +41,18 @@ function FlowCanvas() {
   // Auto-layout
   const autoLayout = useAutoLayout();
 
+  // Refs and state
+  const [quickEditStepId, setQuickEditStepId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  const prevFlowDataRef = useRef(flowData);
+  const reactFlowInstance = useReactFlow();
+
+  // Track last click position for paste
+  const lastClickPosRef = useRef<{ x: number; y: number }>({ x: 100, y: 100 });
+
+  // Track manually added nodes that should NEVER be regenerated
+  const manualNodesRef = useRef<Set<string>>(new Set());
+
   // Expose auto-layout globally for Header to use
   useEffect(() => {
     (window as any).__flowAutoLayout = autoLayout;
@@ -55,17 +67,6 @@ function FlowCanvas() {
     (window as any).__manualNodes = manualNodesRef;
     (window as any).__reactFlowInstance = reactFlowInstance;
   }, [reactFlowInstance]);
-
-  const [quickEditStepId, setQuickEditStepId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
-  const prevFlowDataRef = useRef(flowData);
-  const reactFlowInstance = useReactFlow();
-
-  // Track last click position for paste
-  const lastClickPosRef = useRef<{ x: number; y: number }>({ x: 100, y: 100 });
-
-  // Track manually added nodes that should NEVER be regenerated
-  const manualNodesRef = useRef<Set<string>>(new Set());
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () => yamlToReactFlow(flowData),
