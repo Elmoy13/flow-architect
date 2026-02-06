@@ -23,6 +23,7 @@ import SelectionToolbar from './SelectionToolbar';
 import { useFlowAnimation } from '@/hooks/useFlowAnimation';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useMultiSelect } from '@/hooks/useMultiSelect';
+import { useAutoLayout } from '@/hooks/useAutoLayout';
 
 const nodeTypes = {
   flowNode: FlowNode,
@@ -36,6 +37,17 @@ function FlowCanvas() {
 
   // Multi-select
   const multiSelect = useMultiSelect();
+
+  // Auto-layout
+  const autoLayout = useAutoLayout();
+
+  // Expose auto-layout globally for Header to use
+  useEffect(() => {
+    (window as any).__flowAutoLayout = autoLayout;
+    return () => {
+      delete (window as any).__flowAutoLayout;
+    };
+  }, [autoLayout]);
 
   const [quickEditStepId, setQuickEditStepId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);

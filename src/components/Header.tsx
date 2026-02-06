@@ -86,6 +86,35 @@ export default function Header() {
           <Keyboard className="w-4 h-4" />
         </Button>
 
+        {/* Auto-Layout Button */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" title="Auto-Layout">
+              <Layers className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => (window as any).__flowAutoLayout?.applyVerticalLayout()}
+              className="gap-2"
+            >
+              <Layers className="w-4 h-4" /> Vertical Layout
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => (window as any).__flowAutoLayout?.applyHorizontalLayout()}
+              className="gap-2"
+            >
+              <Layers className="w-4 h-4" /> Horizontal Layout
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => (window as any).__flowAutoLayout?.applyCompactLayout()}
+              className="gap-2"
+            >
+              <Layers className="w-4 h-4" /> Compact Layout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="default" size="sm" className="gap-2">
