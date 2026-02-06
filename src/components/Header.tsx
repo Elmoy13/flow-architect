@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Workflow, Download, FileText, Upload, Layers } from 'lucide-react';
+import { Settings, Workflow, Download, FileText, Upload, Layers, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFlowStore } from '@/store/flowStore';
 import { useToast } from '@/hooks/use-toast';
+import KeyboardShortcutsHelp from './KeyboardShortcutsHelp';
 
 export default function Header() {
   const {
@@ -27,6 +28,7 @@ export default function Header() {
   const [tempBedrockModelId, setTempBedrockModelId] = useState(bedrockModelId);
   const [tempAiProvider, setTempAiProvider] = useState<'openai' | 'bedrock'>(aiProvider);
   const [isOpen, setIsOpen] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   const handleSaveKey = () => {
     setApiKey(tempKey);
@@ -74,6 +76,16 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Keyboard Shortcuts Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowShortcuts(true)}
+          title="Keyboard Shortcuts"
+        >
+          <Keyboard className="w-4 h-4" />
+        </Button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="default" size="sm" className="gap-2">
@@ -175,6 +187,9 @@ export default function Header() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsHelp isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </header>
   );
 }

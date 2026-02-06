@@ -18,7 +18,9 @@ import { useFlowStore, StepType } from '@/store/flowStore';
 import { yamlToReactFlow } from '@/lib/yamlToReactFlow';
 import FlowNode from './FlowNode';
 import QuickEditModal from './QuickEditModal';
+import NodeContextMenu from './NodeContextMenu';
 import { useFlowAnimation } from '@/hooks/useFlowAnimation';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 const nodeTypes = {
   flowNode: FlowNode,
@@ -26,7 +28,11 @@ const nodeTypes = {
 
 function FlowCanvas() {
   const { flowData, setSelectedStepId, selectedStepId, animationEnabled, animationSpeed, addStep, pushFlowHistory } = useFlowStore();
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts();
   const [quickEditStepId, setQuickEditStepId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const prevFlowDataRef = useRef(flowData);
   const reactFlowInstance = useReactFlow();
 
@@ -68,8 +74,18 @@ function FlowCanvas() {
     setQuickEditStepId(node.id);
   }, []);
 
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: { id: string }) => {
+    event.preventDefault();
+    setContextMenu({
+      nodeId: node.id,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }, []);
+
   const onPaneClick = useCallback(() => {
     setSelectedStepId(null);
+    setContextMenu(null);
   }, [setSelectedStepId]);
 
   const onConnect = useCallback((connection: Connection) => {
@@ -141,6 +157,7 @@ function FlowCanvas() {
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
+        onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
         onConnect={onConnect}
         onDragOver={onDragOver}
@@ -193,6 +210,15 @@ function FlowCanvas() {
       <QuickEditModal
         stepId={quickEditStepId}
         onClose={() => setQuickEditStepId(null)}
+      />
+
+      {/* Context Menu */}
+      <NodeContextMenu
+        nodeId={contextMenu?.nodeId || null}
+        position={contextMenu ? { x: contextMenu.x, y: contextMenu.y } : null}
+        onClose={() => setContextMenu(null)}
+        onEdit={(nodeId) => setSelectedStepId(nodeId)}
+        onQuickEdit={(nodeId) => setQuickEditStepId(nodeId)}
       />
     </>
   );
