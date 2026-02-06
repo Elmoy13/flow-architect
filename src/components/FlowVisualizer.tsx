@@ -76,15 +76,18 @@ function FlowCanvas() {
     const isNewFlow = prevStepCount !== currStepCount || prevFlowDataRef.current.flow_id !== flowData.flow_id;
 
     if (isNewFlow && newNodes.length > 0) {
+      // Get current nodes state directly (not from closure)
+      const currentNodes = nodes;
+
       // Only update if this is a completely new flow or nodes don't exist yet
       // Don't overwrite manually placed nodes
-      const existingNodeIds = new Set(nodes.map(n => n.id));
+      const existingNodeIds = new Set(currentNodes.map(n => n.id));
       const hasNewNodes = newNodes.some(n => !existingNodeIds.has(n.id));
 
-      if (hasNewNodes || nodes.length === 0) {
+      if (hasNewNodes || currentNodes.length === 0) {
         // Merge: keep existing node positions, add new ones with generated positions
         const mergedNodes = newNodes.map(newNode => {
-          const existing = nodes.find(n => n.id === newNode.id);
+          const existing = currentNodes.find(n => n.id === newNode.id);
           return existing ? { ...newNode, position: existing.position } : newNode;
         });
 
@@ -95,7 +98,7 @@ function FlowCanvas() {
     }
 
     prevFlowDataRef.current = flowData;
-  }, [flowData, setNodes, setEdges, startAnimation, nodes]);
+  }, [flowData, setNodes, setEdges, startAnimation]);
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: { id: string }) => {
     // Handle multi-select with Shift/Ctrl
