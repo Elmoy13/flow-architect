@@ -49,10 +49,23 @@ function FlowCanvas() {
     };
   }, [autoLayout]);
 
+  // Expose last click position and manual nodes for keyboard shortcuts
+  useEffect(() => {
+    (window as any).__lastClickPos = lastClickPosRef;
+    (window as any).__manualNodes = manualNodesRef;
+    (window as any).__reactFlowInstance = reactFlowInstance;
+  }, [reactFlowInstance]);
+
   const [quickEditStepId, setQuickEditStepId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const prevFlowDataRef = useRef(flowData);
   const reactFlowInstance = useReactFlow();
+
+  // Track last click position for paste
+  const lastClickPosRef = useRef<{ x: number; y: number }>({ x: 100, y: 100 });
+
+  // Track manually added nodes that should NEVER be regenerated
+  const manualNodesRef = useRef<Set<string>>(new Set());
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () => yamlToReactFlow(flowData),
@@ -85,8 +98,14 @@ function FlowCanvas() {
       const hasNewNodes = newNodes.some(n => !existingNodeIds.has(n.id));
 
       if (hasNewNodes || currentNodes.length === 0) {
-        // Merge: keep existing node positions, add new ones with generated positions
+        // Merge: keep existing node positions, SKIP manually added nodes
         const mergedNodes = newNodes.map(newNode => {
+          // If manually added, keep existing completely (don't regenerate)
+          if (manualNodesRef.current.has(newNode.id)) {
+            const existing = currentNodes.find(n => n.id === newNode.id);
+            return existing || newNode;
+          }
+          // Otherwise merge with existing position if available
           const existing = currentNodes.find(n => n.id === newNode.id);
           return existing ? { ...newNode, position: existing.position } : newNode;
         });
@@ -128,10 +147,19 @@ function FlowCanvas() {
     });
   }, []);
 
-  const onPaneClick = useCallback(() => {
+  const onPaneClick = useCallback((event: React.MouseEvent) => {
     setSelectedStepId(null);
     setContextMenu(null);
-  }, [setSelectedStepId]);
+
+    // Track last click position for paste
+    if (reactFlowInstance) {
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      lastClickPosRef.current = position;
+    }
+  }, [setSelectedStepId, reactFlowInstance]);
 
   const onConnect = useCallback((connection: Connection) => {
     setEdges((eds) => addEdge(connection, eds));
@@ -207,6 +235,13 @@ function FlowCanvas() {
 
       // Add node directly to React Flow
       setNodes((nds) => nds.concat(newNode));
+
+      // Mark as manually added
+      const manualNodes = (window as any).__manualNodes?.current;
+      if (manualNodes) {
+        manualNodes.add(stepId);
+      }
+
       setSelectedStepId(stepId);
     },
     [reactFlowInstance, addStep, pushFlowHistory, setSelectedStepId, setNodes]

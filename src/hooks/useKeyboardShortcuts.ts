@@ -67,13 +67,17 @@ export function useKeyboardShortcuts() {
                         pushFlowHistory();
                         addStep(newStep);
 
-                        // Add visual node with offset position
+                        // Use last click position on canvas (from window global)
+                        const lastClickPos = (window as any).__lastClickPos?.current || { x: 100, y: 100 };
+                        const manualNodes = (window as any).__manualNodes?.current;
+
+                        // Add visual node at last click position
                         const newNode: Node = {
                             id: newStepId,
                             type: 'flowNode',
                             position: {
-                                x: copied.position.x + 50,
-                                y: copied.position.y + 50,
+                                x: lastClickPos.x,
+                                y: lastClickPos.y,
                             },
                             data: {
                                 ...copied.nodeData,
@@ -84,9 +88,14 @@ export function useKeyboardShortcuts() {
 
                         setNodes((nds) => nds.concat(newNode));
 
+                        // Mark as manually added
+                        if (manualNodes) {
+                            manualNodes.add(newStepId);
+                        }
+
                         toast({
                             title: 'Node pasted',
-                            description: `Created "${newStep.name}"`,
+                            description: `Created "${newStep.name}" at cursor position`,
                         });
                     } catch (error) {
                         console.error('Failed to paste:', error);
@@ -110,7 +119,9 @@ export function useKeyboardShortcuts() {
                     pushFlowHistory();
                     addStep(newStep);
 
-                    // Add visual node with offset position
+                    const manualNodes = (window as any).__manualNodes?.current;
+
+                    // Add visual node with offset (next to original)
                     const newNode: Node = {
                         id: newStepId,
                         type: 'flowNode',
@@ -127,9 +138,14 @@ export function useKeyboardShortcuts() {
 
                     setNodes((nds) => nds.concat(newNode));
 
+                    // Mark as manually added
+                    if (manualNodes) {
+                        manualNodes.add(newStepId);
+                    }
+
                     toast({
                         title: 'Node duplicated',
-                        description: `Created "${newStep.name}"`,
+                        description: `Created "${newStep.name}" next to original`,
                     });
                 }
             }
