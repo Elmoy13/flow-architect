@@ -152,10 +152,13 @@ interface FlowStore {
       action: string;
       affectedSteps: string[];
     }>;
-    flowHistory: FlowData[];
+    flowHistory: Array<{
+      flowData: FlowData;
+      nodePositions: Map<string, { x: number; y: number }>;
+    }>;
   };
-  pushFlowHistory: () => void;
-  undoLastChange: () => void;
+  pushFlowHistory: (nodePositions?: Map<string, { x: number; y: number }>) => void;
+  undoLastChange: () => Map<string, { x: number; y: number }> | null;
 
   // Animation Settings
   animationEnabled: boolean;
@@ -452,24 +455,32 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
   },
 
   agentContext: { lastModifications: [], flowHistory: [] },
-  pushFlowHistory: () => {
+  pushFlowHistory: (nodePositions) => {
     set((state) => ({
       agentContext: {
         ...state.agentContext,
-        flowHistory: [...state.agentContext.flowHistory, { ...get().flowData }].slice(-10),
+        flowHistory: [
+          ...state.agentContext.flowHistory,
+          {
+            flowData: { ...get().flowData },
+            nodePositions: nodePositions || new Map(),
+          },
+        ].slice(-10),
       },
     }));
   },
   undoLastChange: () => {
     const history = get().agentContext.flowHistory;
     if (history.length > 0) {
-      const previousFlow = history[history.length - 1];
+      const previousState = history[history.length - 1];
       set({
-        flowData: previousFlow,
-        yamlContent: flowDataToYaml(previousFlow),
+        flowData: previousState.flowData,
+        yamlContent: flowDataToYaml(previousState.flowData),
         agentContext: { ...get().agentContext, flowHistory: history.slice(0, -1) },
       });
+      return previousState.nodePositions;
     }
+    return null;
   },
 
   animationEnabled: localStorage.getItem('animationEnabled') !== 'false',

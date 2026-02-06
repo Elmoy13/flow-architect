@@ -91,6 +91,18 @@ function FlowCanvas() {
       return;
     }
 
+    // Check if this is an undo operation with restored positions
+    const restoredPositions = (window as any).__restoredPositions;
+    if (restoredPositions) {
+      // Use restored positions from undo
+      delete (window as any).__restoredPositions;
+      const { nodes: newNodes, edges: newEdges } = yamlToReactFlow(flowData, restoredPositions);
+      setNodes(newNodes);
+      setEdges(newEdges);
+      prevFlowDataRef.current = flowData;
+      return;
+    }
+
     // Build position map from current nodes
     const positionMap = new Map(
       nodes.map(n => [n.id, n.position])
@@ -108,7 +120,7 @@ function FlowCanvas() {
     }
 
     prevFlowDataRef.current = flowData;
-  }, [flowData, setNodes, setEdges, startAnimation]);
+  }, [flowData, setNodes, setEdges, startAnimation, nodes]);
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: { id: string }) => {
     // Handle multi-select with Shift/Ctrl
@@ -178,7 +190,11 @@ function FlowCanvas() {
         y: event.clientY,
       });
 
-      pushFlowHistory();
+      // Save positions before dropping
+      const positionMap = new Map(
+        nodes.map(n => [n.id, n.position])
+      );
+      pushFlowHistory(positionMap);
 
       // CRITICAL: Set flag to skip next useEffect update
       // This prevents race condition where useEffect runs with stale nodes state
@@ -237,7 +253,7 @@ function FlowCanvas() {
 
       setSelectedStepId(stepId);
     },
-    [reactFlowInstance, addStep, pushFlowHistory, setSelectedStepId, setNodes]
+    [reactFlowInstance, addStep, pushFlowHistory, setSelectedStepId, setNodes, nodes]
   );
 
   const visibleNodes = isAnimating

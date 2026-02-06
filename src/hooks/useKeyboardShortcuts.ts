@@ -83,7 +83,11 @@ export function useKeyboardShortcuts() {
                             config: copied.step.config,
                         };
 
-                        pushFlowHistory();
+                        // Save positions before pasting
+                        const positionMap = new Map(
+                            getNodes().map(n => [n.id, n.position])
+                        );
+                        pushFlowHistory(positionMap);
 
                         // Set skip flag to prevent useEffect race condition
                         const skipRef = (window as any).__skipNextUpdate;
@@ -133,7 +137,13 @@ export function useKeyboardShortcuts() {
             if (cmdOrCtrl && e.key === 'z' && !e.shiftKey) {
                 e.preventDefault();
                 if (agentContext.flowHistory.length > 0) {
-                    undoLastChange();
+                    const restoredPositions = undoLastChange();
+
+                    // Trigger position restoration via window global
+                    if (restoredPositions) {
+                        (window as any).__restoredPositions = restoredPositions;
+                    }
+
                     toast({
                         title: 'Undo',
                         description: 'Reverted to previous state',

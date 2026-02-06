@@ -58,18 +58,28 @@ export function useMultiSelect() {
     const deleteSelectedNodes = useCallback(() => {
         if (selectedIds.length === 0) return;
 
-        pushFlowHistory();
+        // Save positions before deleting
+        const positionMap = new Map(
+            getNodes().map(n => [n.id, n.position])
+        );
+        pushFlowHistory(positionMap);
+
         selectedIds.forEach((id) => {
             deleteStep(id);
         });
         clearSelection();
-    }, [selectedIds, deleteStep, pushFlowHistory, clearSelection]);
+    }, [selectedIds, deleteStep, pushFlowHistory, clearSelection, getNodes]);
 
     // Duplicate selected nodes
     const duplicateSelectedNodes = useCallback(() => {
         if (selectedIds.length === 0) return;
 
-        pushFlowHistory();
+        // Save positions before duplicating
+        const positionMap = new Map(
+            getNodes().map(n => [n.id, n.position])
+        );
+        pushFlowHistory(positionMap);
+
         const nodesToDuplicate = selectedNodes;
 
         // Generate base timestamp ONCE to prevent ID collision
@@ -117,7 +127,7 @@ export function useMultiSelect() {
         // Select the new nodes using same baseTimestamp
         const newIds = nodesToDuplicate.map((_, index) => `step_${baseTimestamp}_${index}`);
         setTimeout(() => selectNodes(newIds), 50);
-    }, [selectedIds, selectedNodes, flowData, addStep, setNodes, selectNodes, pushFlowHistory]);
+    }, [selectedIds, selectedNodes, flowData, addStep, setNodes, selectNodes, pushFlowHistory, getNodes]);
 
     // Keyboard shortcuts for batch operations
     useEffect(() => {
