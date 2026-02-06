@@ -51,77 +51,19 @@ export function useFlowAnimation(
 
     const startAnimation = useCallback(
         (nodes: Node[], edges: Edge[]) => {
-            if (!config.enabled || nodes.length === 0) {
-                // Si animaciones deshabilitadas, mostrar todo inmediatamente
-                setVisibleNodeIds(new Set(nodes.map((n) => n.id)));
-                setVisibleEdgeIds(new Set(edges.map((e) => e.id)));
-                return;
-            }
-
-            // Reset y comenzar animación
-            resetAnimation();
-            setAnimationQueue({ nodes, edges });
-            setIsAnimating(true);
+            // Always show everything immediately for fluid experience
+            setVisibleNodeIds(new Set(nodes.map((n) => n.id)));
+            setVisibleEdgeIds(new Set(edges.map((e) => e.id)));
+            setIsAnimating(false);
         },
-        [config.enabled, resetAnimation]
+        []
     );
 
-    // Efecto para animar secuencialmente
-    useEffect(() => {
-        if (!animationQueue || !isAnimating) return;
-
-        const { nodes, edges } = animationQueue;
-        const delays = SPEED_DELAYS[config.speed];
-
-        // Crear mapa de edges por nodo fuente
-        const edgesBySource = new Map<string, Edge[]>();
-        edges.forEach((edge) => {
-            const sourceEdges = edgesBySource.get(edge.source) || [];
-            sourceEdges.push(edge);
-            edgesBySource.set(edge.source, sourceEdges);
-        });
-
-        let currentIndex = 0;
-        const timeouts: NodeJS.Timeout[] = [];
-
-        const animateNext = () => {
-            if (currentIndex >= nodes.length) {
-                setIsAnimating(false);
-                return;
-            }
-
-            const currentNode = nodes[currentIndex];
-
-            // Mostrar nodo actual
-            setVisibleNodeIds((prev) => new Set([...prev, currentNode.id]));
-
-            // Después de un delay, mostrar edges que salen de este nodo
-            const edgeTimeout = setTimeout(() => {
-                const outgoingEdges = edgesBySource.get(currentNode.id) || [];
-                setVisibleEdgeIds((prev) => {
-                    const newSet = new Set(prev);
-                    outgoingEdges.forEach((edge) => newSet.add(edge.id));
-                    return newSet;
-                });
-            }, delays.edge);
-
-            timeouts.push(edgeTimeout);
-
-            currentIndex++;
-
-            // Programar siguiente nodo
-            const nodeTimeout = setTimeout(animateNext, delays.node);
-            timeouts.push(nodeTimeout);
-        };
-
-        // Comenzar animación
-        animateNext();
-
-        // Cleanup
-        return () => {
-            timeouts.forEach(clearTimeout);
-        };
-    }, [animationQueue, isAnimating, config.speed]);
+    // Animation effect disabled for fluid experience - everything shows immediately
+    // useEffect(() => {
+    //     if (!animationQueue || !isAnimating) return;
+    //     ... animation logic removed for performance
+    // }, [animationQueue, isAnimating, config.speed]);
 
     return {
         visibleNodeIds,
